@@ -1,0 +1,87 @@
+[
+  {
+    "id": "intro_godfather",
+    "title": "The Godfather's Legacy",
+    "category": "Film",
+    "difficulty": "Level 1: Foundation",
+    "description": "Discover how Coppola used shadows to birth the 'New Hollywood' era of anti-heroes.",
+    "prerequisites": [],
+    "completed": true,
+    "context": "When Francis Ford Coppola released The Godfather in 1972, he didn't just make a movie about the mafia; he redefined the Hollywood blockbuster.",
+    "insight": "But the real genius of The Godfather lies in its lighting and pacing. Cinematographer Gordon Willis intentionally underlit Marlon Brando's eyes to make Vito Corleone look an enigma, plunging the characters into a moral darkness that mirrored their lives.",
+    "significance": "At a time when Hollywood was obsessed with bright, colorful epics, The Godfather introduced the 'New Hollywood' era of gritty, shadows-first storytelling. Today, every prestige TV show from The Sopranos to Succession owes its visual darkness and anti-hero focus directly to Coppola's masterpiece.",
+    "convo_hooks": [
+      "Did you know the cinematographer for The Godfather was nicknamed 'The Prince of Darkness' because the studio hated how dark his lighting was?",
+      "Next time someone brings up prestige TV, mention how The Godfather invented the 'sympathetic anti-hero' trope we see in shows like Succession."
+    ],
+    "thinking_prompt": "If you were to create a modern 'anti-hero', what fatal flaw would they have that makes them relatable but dangerous?"
+  },
+  {
+    "id": "monet_water_lilies",
+    "title": "Monet's Rebellion",
+    "category": "Art",
+    "difficulty": "Level 2: Rebellion",
+    "description": "Why painting outside was considered the ultimate 19th-century scandal.",
+    "prerequisites": [],
+    "completed": false,
+    "context": "We often view Impressionism today as pleasant, harmless paintings you might find on a tote bag or an umbrella. But when Claude Monet and his peers first displayed their work in the 1870s, it was considered scandalous.",
+    "insight": "The French fine art establishment demanded historical, realistic paintings created indoors. Monet did the exact opposite. He took his easel outside (en plein air), ignored fine details, and instead painted the feeling of light itself.",
+    "significance": "His famous water lilies series wasn't just him painting his garden over and over; it was an obsessive study of how light and color change by the hour. It was the ultimate artistic rebellion—choosing capturing a fleeting real-world moment over an idealized, permanent myth.",
+    "convo_hooks": [
+      "Impressionism was originally an insult. A critic saw Monet's 'Impression, Sunrise' and basically called it an unfinished sketch.",
+      "You can think of Impressionism as the 19th-century equivalent of an unfiltered, in-the-moment Instagram story."
+    ],
+    "thinking_prompt": "Why do you think rebellious or controversial art often becomes the status quo in later generations?"
+  },
+  {
+    "id": "stoic_amor_fati",
+    "title": "Embracing Amor Fati",
+    "category": "History",
+    "difficulty": "Level 2: Mindset",
+    "description": "Learn the ancient mental judo of flipping stress into growth through Amor Fati.",
+    "prerequisites": [],
+    "completed": false,
+    "context": "Stoicism gets a bad rap today as just 'suppressing your emotions.' But ancient Roman philosophers like Marcus Aurelius and Seneca practiced something much more profound...",
+    "insight": "Amor Fati, or 'Love of Fate.' To the Stoics, not only should you accept whatever happens to you, but you should actively love it.",
+    "significance": "Lost your job? Your flight got delayed? A Stoic views every obstacle as the exact fuel needed to practice patience, courage, and resilience. Amor Fati is the ultimate mental judo, flipping stress into an opportunity for growth.",
+    "convo_hooks": [
+      "Whenever something goes wrong, you can use the phrase 'Amor Fati'—it's a highbrow way of saying 'it is what it is, let's use it.'",
+      "Marcus Aurelius was the most powerful man in the world (a Roman Emperor), yet his diary was just him telling himself to stay humble."
+    ],
+    "thinking_prompt": "Think of a recent setback you experienced. How could you reframe it as an opportunity using the mindset of Amor Fati?"
+  },
+  {
+    "id": "total_football",
+    "title": "Total Football's Strategy",
+    "category": "Sport",
+    "difficulty": "Level 3: Systems",
+    "description": "How the Dutch revolutionized spatial awareness over rigid specialization.",
+    "prerequisites": [],
+    "completed": false,
+    "context": "If you want to sound knowledgeable about soccer without watching 90 minutes every weekend, you only need to understand one concept: Total Football (Totaalvoetbal).",
+    "insight": "Invented by the Dutch in the 1970s and perfected by Johan Cruyff, it revolutionized how the game is played. Before Total Football, players had strict, rigid positions. A defender stayed back; a forward attacked. Total Football threw that away.",
+    "significance": "Its philosophy was fluid: any player on the pitch could take over the role of any other player. It required extreme cardiovascular fitness and spatial awareness. Today, modern giants like Manchester City and Barcelona still use derivatives of this exact philosophy.",
+    "convo_hooks": [
+      "When people talk about Pep Guardiola's dominant teams, they are really talking about the modern evolution of Cruyff's Total Football.",
+      "The core of Total Football isn't just skill—it's about spatial awareness. It's almost more of a real-time chess match than a physical sport."
+    ],
+    "thinking_prompt": "Where else in life or business do you think a fluid, 'role-switching' team strategy would perform better than rigid specialization?"
+  },
+  {
+    "id": "minimalism_roots",
+    "title": "Minimalism's True Origin",
+    "category": "Culture",
+    "difficulty": "Level 3: Perspective",
+    "description": "Minimalism wasn't a lifestyle trend—it was a rebellion against the artist's ego.",
+    "prerequisites": [],
+    "completed": false,
+    "context": "Minimalism is often stereotyped as sparse, sterile white rooms with a single uncomfy chair. However, its cultural roots in the 1960s were far deeper than an interior design trend.",
+    "insight": "Originally emerging in the New York art sphere as a reaction to the emotional, chaotic splatter-paintings of Abstract Expressionism, minimalism was about stripping away the artist's ego.",
+    "significance": "Artists like Donald Judd used industrial materials and simple geometric shapes so the viewer would focus on the object itself. Today, minimalism has morphed into a lifestyle response against extreme consumerism—the idea that clearing physical clutter clears mental space.",
+    "convo_hooks": [
+      "Minimalism actually started as a 1960s art rebellion, not a Marie Kondo-style organization trend.",
+      "If someone brings up modern aesthetic trends, note how minimalism shifts the focus from the creator's ego to the viewer's experience."
+    ],
+    "thinking_prompt": "What is one 'cluttered' area of your daily routine (digital or physical) that you could ruthlessly minimize to gain focus?"
+  }
+]
