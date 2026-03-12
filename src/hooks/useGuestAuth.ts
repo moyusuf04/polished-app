@@ -6,6 +6,7 @@ export type UserStatus = 'loading' | 'anonymous' | 'authenticated' | 'unauthenti
 export function useGuestAuth() {
   const [status, setStatus] = useState<UserStatus>('loading');
   const [userId, setUserId] = useState<string | null>(null);
+  const [guestId, setGuestId] = useState<string | null>(null);
   const [completedLessons, setCompletedLessons] = useState<number>(0);
   const supabase = createClient();
 
@@ -33,6 +34,7 @@ export function useGuestAuth() {
             localStorage.setItem('guestId', id);
           }
           setUserId(id);
+          setGuestId(id);
           setStatus('local');
         }
       }
@@ -55,11 +57,24 @@ export function useGuestAuth() {
 
   const isSignupRequired = completedLessons >= 3 && (status === 'anonymous' || status === 'local');
 
+  /**
+   * Clears all local guest state after successful migration to a permanent account.
+   * Call this after the migrate_guest_data RPC returns successfully.
+   */
+  const clearGuestData = () => {
+    localStorage.removeItem('guestId');
+    localStorage.removeItem('completed_lessons');
+    setGuestId(null);
+    setCompletedLessons(0);
+  };
+
   return {
     status,
     userId,
+    guestId,
     completedLessons,
     incrementLessons,
+    clearGuestData,
     isSignupRequired
   };
 }

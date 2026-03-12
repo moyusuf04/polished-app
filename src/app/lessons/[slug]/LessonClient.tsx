@@ -22,7 +22,7 @@ export function LessonClient({ lessonId, prompt, onDone }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   
-  const { status, incrementLessons, isSignupRequired } = useGuestAuth();
+  const { status, guestId, incrementLessons, isSignupRequired } = useGuestAuth();
   const supabase = createClient();
 
   // Handle the transition from content to "The Room"
@@ -186,7 +186,7 @@ export function LessonClient({ lessonId, prompt, onDone }: Props) {
              
              <div className="w-full space-y-6">
                <Link 
-                 href="/signup"
+                 href={guestId ? `/signup?origin_guest_id=${guestId}` : "/signup"}
                  className="block w-full py-5 bg-white text-black text-[11px] font-bold tracking-[0.25em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 transition-all shadow-xl shadow-white/5"
                >
                  Create account

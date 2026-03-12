@@ -1,14 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Read the guest ID passed from the conversion wall in LessonClient
+  const originGuestId = searchParams.get('origin_guest_id');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -60,9 +64,31 @@ export default function SignupPage() {
     if (errorToHandle) {
       setError(errorToHandle.message);
       setIsLoading(false);
-    } else {
-      router.push('/hub');
+      return;
     }
+
+    // --- Guest Data Migration ---
+    // If the user came from the conversion wall with a local guest ID,
+    // call the RPC to atomically transfer their progress and reflections.
+    if (originGuestId) {
+      const { data: { session: newSession } } = await supabase.auth.getSession();
+      if (newSession) {
+        const { error: rpcError } = await supabase.rpc('migrate_guest_data', {
+          new_user_id: newSession.user.id,
+          guest_id: originGuestId,
+        });
+        if (rpcError) {
+          // Non-fatal: log but don't block navigation. Data may already be linked
+          // (standard anon users) or will be retrieved from server on next login.
+          console.warn('Guest data migration warning:', rpcError.message);
+        }
+      }
+      // Clear local guest state regardless of RPC result
+      localStorage.removeItem('guestId');
+      localStorage.removeItem('completed_lessons');
+    }
+
+    router.push('/hub');
   };
 
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
