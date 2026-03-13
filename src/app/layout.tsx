@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} ${outfit.variable} ${playfair.variable} ${dmSans.variable} font-sans bg-zinc-950 text-white min-h-screen antialiased selection:bg-zinc-800 selection:text-white`}>
         <div className="noise-texture" />
         {children}
