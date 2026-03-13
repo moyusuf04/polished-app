@@ -68,8 +68,8 @@ export default function SignupPage() {
     }
 
     // --- Guest Data Migration ---
-    // If the user came from the conversion wall with a local guest ID,
-    // call the RPC to atomically transfer their progress and reflections.
+    // If the user came with a local fallback guest ID, call the RPC to
+    // atomically transfer their progress to their new permanent user ID.
     if (originGuestId) {
       const { data: { session: newSession } } = await supabase.auth.getSession();
       if (newSession) {
@@ -78,15 +78,17 @@ export default function SignupPage() {
           guest_id: originGuestId,
         });
         if (rpcError) {
-          // Non-fatal: log but don't block navigation. Data may already be linked
-          // (standard anon users) or will be retrieved from server on next login.
+          // Non-fatal: log but don't block navigation. Data is already linked
+          // for standard anon users (same UUID is reused by Supabase).
           console.warn('Guest data migration warning:', rpcError.message);
         }
       }
-      // Clear local guest state regardless of RPC result
-      localStorage.removeItem('guestId');
-      localStorage.removeItem('completed_lessons');
     }
+
+    // Always clear local guest state on any successful signup/upgrade.
+    // This prevents the conversion wall from flashing for permanent users.
+    localStorage.removeItem('guestId');
+    localStorage.removeItem('completed_lessons');
 
     router.push('/hub');
   };
