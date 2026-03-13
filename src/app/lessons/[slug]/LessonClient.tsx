@@ -5,7 +5,7 @@ import { ReflectionBox } from '@/components/ReflectionBox';
 import { DiscussionFeed } from '@/components/DiscussionFeed';
 import { useGuestAuth } from '@/hooks/useGuestAuth';
 import { createClient } from '@/lib/supabase/client';
-import { Sparkles, ArrowRight, Home, AlertCircle } from 'lucide-react';
+import { ArrowRight, Home, AlertCircle, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 interface Props {
@@ -22,7 +22,7 @@ export function LessonClient({ lessonId, prompt, onDone }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   
-  const { status, guestId, incrementLessons, isSignupRequired } = useGuestAuth();
+  const { status, incrementLessons } = useGuestAuth();
   const supabase = createClient();
 
   // Handle the transition from content to "The Room"
@@ -65,7 +65,8 @@ export function LessonClient({ lessonId, prompt, onDone }: Props) {
         throw rErr;
       }
 
-      // Success: trigger UI transition
+      // Success: trigger UI transition and increment counter
+      incrementLessons();
       setHasSubmitted(true);
     } catch (err: any) {
       console.error('Critical sync failure:', err);
@@ -157,7 +158,6 @@ export function LessonClient({ lessonId, prompt, onDone }: Props) {
           <div className="mt-8 mb-24 animate-in fade-in duration-1000 slide-in-from-bottom-4">
              <button 
                onClick={() => {
-                 incrementLessons();
                  onDone?.();
                }}
                className="px-12 py-5 bg-white/5 border border-white/10 hover:border-white/30 text-white text-[10px] font-bold tracking-[0.3em] uppercase rounded-sm transition-all flex items-center gap-4 group"
@@ -166,39 +166,6 @@ export function LessonClient({ lessonId, prompt, onDone }: Props) {
                Complete Session & Return
              </button>
           </div>
-        </div>
-      )}
-
-      {/* Guest Conversion Modal Overlay */}
-      {isSignupRequired && (status === 'anonymous' || status === 'local') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/98 px-6 animate-in fade-in duration-500">
-           <div className="w-full max-w-md p-10 bg-[#0d0d10] border border-white/5 rounded-sm shadow-2xl text-center flex flex-col items-center relative">
-             <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D4A017] to-transparent" />
-             
-             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-8 border-b-4 border-zinc-300">
-                <Sparkles className="w-7 h-7 text-black" />
-             </div>
-             
-             <h2 className="text-3xl font-serif text-white mb-4 tracking-tight">You've had a taste!</h2>
-             <p className="text-white/30 mb-12 leading-relaxed text-[11px] tracking-widest uppercase font-bold">
-               Create a free account to keep going and save everything you have learned.
-             </p>
-             
-             <div className="w-full space-y-6">
-               <Link 
-                 href={guestId ? `/signup?origin_guest_id=${guestId}` : "/signup"}
-                 className="block w-full py-5 bg-white text-black text-[11px] font-bold tracking-[0.25em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 transition-all shadow-xl shadow-white/5"
-               >
-                 Create account
-               </Link>
-               <button 
-                 onClick={onDone}
-                 className="block w-full py-4 text-white/20 hover:text-white transition-all text-[10px] font-bold tracking-[0.3em] uppercase"
-               >
-                 Back to Hub
-               </button>
-             </div>
-           </div>
         </div>
       )}
     </div>

@@ -1,9 +1,11 @@
 'use client';
 
-import { ArrowLeft, Lightbulb, X } from 'lucide-react';
+import { ArrowLeft, Lightbulb, X, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LessonClient } from '@/app/lessons/[slug]/LessonClient';
 import { useLessonSlides } from '@/hooks/useLessonSlides';
+import { useGuestAuth } from '@/hooks/useGuestAuth';
+import Link from 'next/link';
 
 interface Props {
   title: string;
@@ -38,6 +40,8 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onB
     prevSlide,
     displayStep
   } = useLessonSlides(contentSlides.length);
+
+  const { status, guestId, isSignupRequired } = useGuestAuth();
 
   return (
     <div className="w-full min-h-screen relative pb-32 flex flex-col items-center justify-center bg-black overflow-hidden">
@@ -157,6 +161,39 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onB
            >
              Continue &rarr;
            </motion.button>
+        </div>
+      )}
+
+      {/* Guest Conversion Modal Overlay - Moved to High Level Reader */}
+      {isSignupRequired && (status === 'anonymous' || status === 'local') && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/98 px-6 animate-in fade-in duration-500">
+           <div className="w-full max-w-md p-10 bg-[#0d0d10] border border-white/5 rounded-sm shadow-2xl text-center flex flex-col items-center relative">
+             <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D4A017] to-transparent" />
+             
+             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-8 border-b-4 border-zinc-300">
+                <Sparkles className="w-7 h-7 text-black" />
+             </div>
+             
+             <h2 className="text-3xl font-serif text-white mb-4 tracking-tight">You've had a taste!</h2>
+             <p className="text-white/30 mb-12 leading-relaxed text-[11px] tracking-widest uppercase font-bold">
+               Create a free account to keep going and save everything you have learned.
+             </p>
+             
+             <div className="w-full space-y-6">
+               <Link 
+                  href={guestId ? `/signup?origin_guest_id=${guestId}` : "/signup"}
+                  className="block w-full py-5 bg-white text-black text-[11px] font-bold tracking-[0.25em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 transition-all shadow-xl shadow-white/5"
+                >
+                  Create account
+               </Link>
+               <button 
+                 onClick={onBack}
+                 className="block w-full py-4 text-white/20 hover:text-white transition-all text-[10px] font-bold tracking-[0.3em] uppercase"
+               >
+                 Back to Hub
+               </button>
+             </div>
+           </div>
         </div>
       )}
     </div>

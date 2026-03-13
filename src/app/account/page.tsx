@@ -5,6 +5,11 @@ import MineralTrackStatus from '@/components/account/MineralTrackStatus';
 import AlumniCredentials from '@/components/account/AlumniCredentials';
 import SpotlightArchive from '@/components/account/SpotlightArchive';
 import IntelDropCustomiser from '@/components/account/IntelDropCustomiser';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
+
+const supabase = createClient();
 
 // We reuse the CSS from the design identity page to maintain the lithic aesthetic.
 const css = `
@@ -35,20 +40,43 @@ const css = `
 `;
 
 export default function AccountPage() {
+  const [reflectionCount, setReflectionCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAccountData() {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        const { count, error } = await supabase
+          .from('reflections')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+        
+        if (!error && count !== null) {
+          setReflectionCount(count);
+        }
+      }
+      setIsLoading(false);
+    }
+
+    fetchAccountData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <main className="polished-root flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-white/10 animate-spin" />
+      </main>
+    );
+  }
+
   return (
     <main className="polished-root selection:bg-zinc-800">
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="noise-overlay" />
       
-      {/* 
-        The flow of the Account Page as per requirements:
-        1. Core Identity & 'Saved' Metric
-        2. Current Growth (Progress Rings)
-        3. Intellectual Assets (Alumni & Spotlight)
-        4. Identity/Sharing Engine (Intel Drop)
-      */}
-      
-      <AccountHeader insightsProvided={14} />
+      <AccountHeader insightsProvided={reflectionCount} />
       <MineralTrackStatus />
       <AlumniCredentials />
       <SpotlightArchive />
