@@ -139,11 +139,20 @@ export default function IntelDropCustomiser({ reflections, displayName }: IntelD
               className="w-full relative bg-[#0d0d10] border flex flex-col justify-between shadow-2xl transition-all duration-500"
               style={{
                 aspectRatio: '3/4',
-                borderColor: m.light + '40',
+                borderColor: selectedReflection?.category_color 
+                  ? `${selectedReflection.category_color}60` 
+                  : `${m.light}40`,
               }}
             >
               {/* Top Gradient Border */}
-              <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${m.dark}, ${m.light})` }} />
+              <div 
+                className="h-1 w-full" 
+                style={{ 
+                  background: selectedReflection?.category_color
+                    ? `linear-gradient(90deg, ${selectedReflection.category_color}cc, ${selectedReflection.category_color})`
+                    : `linear-gradient(90deg, ${m.dark}, ${m.light})` 
+                }} 
+              />
 
               <div className="p-8 md:p-10 flex-1 flex flex-col justify-center">
                 <p className="text-white/30 text-xs tracking-widest uppercase mb-6 flex items-center gap-2">

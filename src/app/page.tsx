@@ -6,6 +6,7 @@ import { motion, Variants } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import Footer from "@/components/Footer";
 
 export default function Home() {
   const router = useRouter();
@@ -90,6 +91,9 @@ export default function Home() {
           </button>
         </motion.div>
       </motion.div>
+      <div className="absolute bottom-0 w-full">
+        <Footer />
+      </div>
     </main>
   );
 }

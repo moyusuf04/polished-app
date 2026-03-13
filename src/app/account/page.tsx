@@ -7,6 +7,7 @@ import AlumniCredentials from '@/components/account/AlumniCredentials';
 import SpotlightArchive from '@/components/account/SpotlightArchive';
 import type { ReflectionEntry } from '@/components/account/SpotlightArchive';
 import IntelDropCustomiser from '@/components/account/IntelDropCustomiser';
+import Footer from '@/components/Footer';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, X } from 'lucide-react';
@@ -74,6 +75,7 @@ interface CategoryProgress {
   mineral: MineralKey;
   progress: number;
   title: string;
+  theme_color: string; // Added theme_color
   completed: number;
   total: number;
 }
@@ -131,7 +133,7 @@ export default function AccountPage() {
           created_at,
           response_text,
           lesson_id,
-          lessons!inner(title, category_id, xp_reward, categories!inner(name))
+          lessons!inner(title, category_id, xp_reward, categories!inner(name, theme_color))
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -147,6 +149,7 @@ export default function AccountPage() {
             lesson_id: r.lesson_id as string,
             lesson_title: (lesson?.title as string) || 'Unknown Lesson',
             category_name: (category?.name as string) || 'Unknown',
+            category_color: (category?.theme_color as string) || '#ffffff',
           };
         });
         setReflections(mapped);
@@ -164,23 +167,24 @@ export default function AccountPage() {
       // 4. Fetch all published lessons grouped by category
       const { data: allLessons } = await supabase
         .from('lessons')
-        .select('id, category_id, xp_reward, categories!inner(name)')
+        .select('id, category_id, xp_reward, categories!inner(name, theme_color)')
         .eq('status', 'published')
         .is('deleted_at', null);
 
       if (allLessons) {
         // Group lessons by category
-        const catMap = new Map<string, { name: string; total: number; completed: number; xpEarned: number }>();
+        const catMap = new Map<string, { name: string; theme_color: string; total: number; completed: number; xpEarned: number }>();
 
         allLessons.forEach((lesson: Record<string, unknown>) => {
           const catId = lesson.category_id as string;
           const category = lesson.categories as Record<string, unknown>;
           const catName = (category?.name as string) || 'Unknown';
+          const catColor = (category?.theme_color as string) || '#ffffff';
           const xp = (lesson.xp_reward as number) || 0;
           const isCompleted = completedLessonIds.has(lesson.id as string);
 
           if (!catMap.has(catId)) {
-            catMap.set(catId, { name: catName, total: 0, completed: 0, xpEarned: 0 });
+            catMap.set(catId, { name: catName, theme_color: catColor, total: 0, completed: 0, xpEarned: 0 });
           }
           const entry = catMap.get(catId)!;
           entry.total++;
@@ -201,6 +205,7 @@ export default function AccountPage() {
             mineral: categoryToMineral(val.name),
             progress,
             title: val.name,
+            theme_color: val.theme_color,
             completed: val.completed,
             total: val.total,
           });
@@ -287,7 +292,7 @@ export default function AccountPage() {
         displayName={profile.display_name}
       />
 
-      <div className="pb-32" />
+      <Footer />
 
       {toastMessage && (
         <Toast message={toastMessage} onClose={() => setToastMessage(null)} />

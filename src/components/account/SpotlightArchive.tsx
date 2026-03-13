@@ -11,6 +11,7 @@ interface ReflectionEntry {
   lesson_id: string;
   lesson_title: string;
   category_name: string;
+  category_color: string;
 }
 
 interface SpotlightArchiveProps {
