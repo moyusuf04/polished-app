@@ -9,15 +9,17 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { CategoryData } from '../../components/PodHub';
-import { LogOut, User, ShieldHalf } from 'lucide-react';
+import { LogOut, User, ShieldHalf, Sparkles } from 'lucide-react';
+import { useGuestAuth } from '@/hooks/useGuestAuth';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 import { Onboarding } from '../../components/Onboarding';
 
+const supabase = createClient();
+
 export default function HubPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [lessons, setLessons] = useState<LessonData[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
@@ -25,6 +27,7 @@ export default function HubPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingSelection, setOnboardingSelection] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { status, guestId, isSignupRequired } = useGuestAuth();
 
   useEffect(() => {
     // Check onboarding status
@@ -118,7 +121,7 @@ export default function HubPage() {
     }
 
     fetchHubData();
-  }, [supabase]);
+  }, [selectedLessonId]);
 
   const handleSelectLesson = (id: string) => {
     setSelectedLessonId(id);
@@ -200,6 +203,39 @@ export default function HubPage() {
         onSelectLesson={handleSelectLesson} 
         initialSelection={onboardingSelection}
       />
+
+      {/* Guest Conversion Modal Overlay - Hub Level */}
+      {isSignupRequired && (status === 'anonymous' || status === 'local') && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/98 px-6 animate-in fade-in duration-500 backdrop-blur-sm">
+           <div className="w-full max-w-md p-10 bg-[#0d0d10] border border-white/5 rounded-sm shadow-2xl text-center flex flex-col items-center relative">
+             <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D4A017] to-transparent" />
+             
+             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-8 border-b-4 border-zinc-300">
+                <Sparkles className="w-7 h-7 text-black" />
+             </div>
+             
+             <h2 className="text-3xl font-serif text-white mb-4 tracking-tight">You've had a taste!</h2>
+             <p className="text-white/30 mb-12 leading-relaxed text-[11px] tracking-widest uppercase font-bold">
+               Create a free account to keep going and save everything you have learned.
+             </p>
+             
+             <div className="w-full space-y-6">
+               <Link 
+                  href={guestId ? `/signup?origin_guest_id=${guestId}` : "/signup"}
+                  className="block w-full py-5 bg-white text-black text-[11px] font-bold tracking-[0.25em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 transition-all shadow-xl shadow-white/5"
+                >
+                  Create account
+               </Link>
+               <button 
+                 onClick={handleSignOut}
+                 className="block w-full py-4 text-white/20 hover:text-white transition-all text-[10px] font-bold tracking-[0.3em] uppercase"
+               >
+                 Exit Session
+               </button>
+             </div>
+           </div>
+        </div>
+      )}
     </motion.main>
   );
 }

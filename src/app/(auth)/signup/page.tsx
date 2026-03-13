@@ -1,14 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Read the guest ID passed from the conversion wall in LessonClient
+  const originGuestId = searchParams.get('origin_guest_id');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -60,9 +64,33 @@ export default function SignupPage() {
     if (errorToHandle) {
       setError(errorToHandle.message);
       setIsLoading(false);
-    } else {
-      router.push('/hub');
+      return;
     }
+
+    // --- Guest Data Migration ---
+    // If the user came with a local fallback guest ID, call the RPC to
+    // atomically transfer their progress to their new permanent user ID.
+    if (originGuestId) {
+      const { data: { session: newSession } } = await supabase.auth.getSession();
+      if (newSession) {
+        const { error: rpcError } = await supabase.rpc('migrate_guest_data', {
+          new_user_id: newSession.user.id,
+          guest_id: originGuestId,
+        });
+        if (rpcError) {
+          // Non-fatal: log but don't block navigation. Data is already linked
+          // for standard anon users (same UUID is reused by Supabase).
+          console.warn('Guest data migration warning:', rpcError.message);
+        }
+      }
+    }
+
+    // Always clear local guest state on any successful signup/upgrade.
+    // This prevents the conversion wall from flashing for permanent users.
+    localStorage.removeItem('guestId');
+    localStorage.removeItem('completed_lessons');
+
+    router.push('/hub');
   };
 
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
@@ -199,5 +227,17 @@ export default function SignupPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-white/10 animate-spin" />
+      </main>
+    }>
+      <SignupContent />
+    </Suspense>
   );
 }
