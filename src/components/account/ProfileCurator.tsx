@@ -3,9 +3,15 @@
 import { useState, useRef, useOptimistic, useTransition } from 'react';
 import { TOKENS } from '@/lib/design-tokens';
 import { createClient } from '@/lib/supabase/client';
+import { updateUserProfile } from '@/actions/account-actions';
 import { Loader2, Camera } from 'lucide-react';
 
 const supabase = createClient();
+
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_NAME_LENGTH = 40;
+const MAX_BIO_LENGTH = 160;
 
 interface ProfileData {
   display_name: string;
@@ -15,17 +21,18 @@ interface ProfileData {
 
 interface ProfileCuratorProps {
   initialProfile: ProfileData;
+  userId: string;
   onProfileUpdate?: (profile: ProfileData) => void;
   onError?: (message: string) => void;
 }
 
 export default function ProfileCurator({
   initialProfile,
+  userId,
   onProfileUpdate,
   onError,
 }: ProfileCuratorProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -37,54 +44,77 @@ export default function ProfileCurator({
   const [editName, setEditName] = useState(initialProfile.display_name);
   const [editBio, setEditBio] = useState(initialProfile.bio);
 
+  // Inline error messages per field
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [bioError, setBioError] = useState<string | null>(null);
+
+  const validateName = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      setNameError('Display name cannot be empty.');
+      return false;
+    }
+    if (trimmed.length > MAX_NAME_LENGTH) {
+      setNameError(`Display name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+      return false;
+    }
+    setNameError(null);
+    return true;
+  };
+
+  const validateBio = (value: string): boolean => {
+    if (value.length > MAX_BIO_LENGTH) {
+      setBioError(`Bio must be ${MAX_BIO_LENGTH} characters or fewer.`);
+      return false;
+    }
+    setBioError(null);
+    return true;
+  };
+
   const handleSave = async () => {
-    setIsSaving(true);
+    // Client-side validation
+    const nameValid = validateName(editName);
+    const bioValid = validateBio(editBio);
+    if (!nameValid || !bioValid) return;
+
+    const trimmedName = editName.trim();
     const updated: ProfileData = {
       ...optimisticProfile,
-      display_name: editName,
+      display_name: trimmedName,
       bio: editBio,
     };
 
-    // Optimistic update
+    // Optimistic update — user sees change instantly
     startTransition(() => setOptimisticProfile(updated));
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      onError?.('You must be signed in to update your profile.');
-      setIsSaving(false);
-      return;
-    }
+    const result = await updateUserProfile(userId, {
+      display_name: trimmedName,
+      bio: editBio,
+    });
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        display_name: editName,
-        bio: editBio,
-      })
-      .eq('id', session.user.id);
-
-    if (error) {
-      onError?.(`Profile update failed: ${error.message}`);
-      // Revert optimistic update
+    if (!result.success) {
+      // Rollback optimistic update
       startTransition(() => setOptimisticProfile(initialProfile));
+      if (result.error) {
+        setNameError(result.error);
+      }
     } else {
       onProfileUpdate?.(updated);
+      setIsEditing(false);
     }
-
-    setIsSaving(false);
-    setIsEditing(false);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-      onError?.('Please select an image file.');
+    // Validate file type
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      onError?.('Only JPEG, PNG, and WebP images are accepted.');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
+    // Validate file size
+    if (file.size > MAX_AVATAR_SIZE) {
       onError?.('Image must be under 2MB.');
       return;
     }
@@ -99,11 +129,26 @@ export default function ProfileCurator({
     }
 
     const ext = file.name.split('.').pop() || 'jpg';
-    const filePath = `${session.user.id}/avatar.${ext}`;
+    const timestamp = Date.now();
+    const newFilePath = `${session.user.id}/avatar-${timestamp}.${ext}`;
+
+    // Delete previous avatar if exists
+    if (optimisticProfile.avatar_url) {
+      try {
+        // Extract file path from the public URL
+        const urlParts = optimisticProfile.avatar_url.split('/avatars/');
+        if (urlParts.length > 1) {
+          const oldPath = urlParts[1].split('?')[0]; // strip cache-buster
+          await supabase.storage.from('avatars').remove([oldPath]);
+        }
+      } catch {
+        // Non-critical — old file may not exist
+      }
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(filePath, file, { upsert: true, contentType: file.type });
+      .upload(newFilePath, file, { upsert: true, contentType: file.type });
 
     if (uploadError) {
       onError?.(`Avatar upload failed: ${uploadError.message}`);
@@ -113,10 +158,14 @@ export default function ProfileCurator({
 
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
-      .getPublicUrl(filePath);
+      .getPublicUrl(newFilePath);
 
     // Append cache-buster to force re-render
-    const freshUrl = `${publicUrl}?t=${Date.now()}`;
+    const freshUrl = `${publicUrl}?t=${timestamp}`;
+
+    // Optimistic update
+    const updated: ProfileData = { ...optimisticProfile, avatar_url: freshUrl };
+    startTransition(() => setOptimisticProfile(updated));
 
     const { error: updateError } = await supabase
       .from('profiles')
@@ -124,14 +173,16 @@ export default function ProfileCurator({
       .eq('id', session.user.id);
 
     if (updateError) {
+      // Rollback
+      startTransition(() => setOptimisticProfile(initialProfile));
       onError?.(`Avatar save failed: ${updateError.message}`);
     } else {
-      const updated: ProfileData = { ...optimisticProfile, avatar_url: freshUrl };
-      startTransition(() => setOptimisticProfile(updated));
       onProfileUpdate?.(updated);
     }
 
     setIsUploading(false);
+    // Reset file input so re-selecting the same file triggers onChange
+    if (fileRef.current) fileRef.current.value = '';
   };
 
   // Hidden file input
@@ -143,11 +194,12 @@ export default function ProfileCurator({
       <div className="flex flex-col md:flex-row gap-8 items-start md:items-center relative z-10 group">
         <div className="relative">
           <div
-            className="w-24 h-24 rounded-sm border flex items-center justify-center overflow-hidden transition-all duration-300"
+            className="w-24 h-24 rounded-sm border flex items-center justify-center overflow-hidden transition-all duration-300 cursor-pointer"
             style={{
               borderColor: TOKENS.subtle,
               backgroundColor: TOKENS.graphite,
             }}
+            onClick={triggerFileSelect}
           >
             {optimisticProfile.avatar_url ? (
               <img
@@ -160,12 +212,22 @@ export default function ProfileCurator({
                 {optimisticProfile.display_name?.charAt(0) || '?'}
               </span>
             )}
-            {isUploading && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            {/* Upload overlay */}
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploading ? (
                 <Loader2 className="w-5 h-5 text-white animate-spin" />
-              </div>
-            )}
+              ) : (
+                <Camera className="w-5 h-5 text-white" />
+              )}
+            </div>
           </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
           <button
             onClick={() => setIsEditing(true)}
             className="absolute -right-2 -bottom-2 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
@@ -203,6 +265,8 @@ export default function ProfileCurator({
           onClick={() => {
             setEditName(optimisticProfile.display_name);
             setEditBio(optimisticProfile.bio);
+            setNameError(null);
+            setBioError(null);
             setIsEditing(false);
           }}
           className="text-xs uppercase tracking-widest text-white/50 hover:text-white transition-colors"
@@ -237,7 +301,7 @@ export default function ProfileCurator({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={handleAvatarUpload}
           />
@@ -253,11 +317,22 @@ export default function ProfileCurator({
           <input
             type="text"
             value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            maxLength={50}
+            onChange={(e) => {
+              setEditName(e.target.value);
+              if (nameError) validateName(e.target.value);
+            }}
+            maxLength={MAX_NAME_LENGTH}
             className="w-full bg-transparent border-b p-2 font-serif text-2xl text-white outline-none focus:border-white transition-colors"
-            style={{ borderColor: TOKENS.subtle }}
+            style={{ borderColor: nameError ? '#ef4444' : TOKENS.subtle }}
           />
+          <div className="flex justify-between mt-1">
+            {nameError ? (
+              <p className="text-[10px] text-red-400">{nameError}</p>
+            ) : (
+              <span />
+            )}
+            <p className="text-[10px] text-white/20">{editName.trim().length}/{MAX_NAME_LENGTH}</p>
+          </div>
         </div>
 
         {/* Bio */}
@@ -265,22 +340,31 @@ export default function ProfileCurator({
           <label className="block text-xs uppercase tracking-wider text-white/50 mb-2">Executive Bio</label>
           <textarea
             value={editBio}
-            onChange={(e) => setEditBio(e.target.value)}
+            onChange={(e) => {
+              setEditBio(e.target.value);
+              if (bioError) validateBio(e.target.value);
+            }}
             rows={3}
-            maxLength={280}
+            maxLength={MAX_BIO_LENGTH}
             className="w-full bg-transparent border p-3 font-sans font-light text-sm text-white/80 outline-none focus:border-white/50 rounded-sm transition-colors resize-none"
-            style={{ borderColor: TOKENS.hairline }}
+            style={{ borderColor: bioError ? '#ef4444' : TOKENS.hairline }}
           />
-          <p className="text-[10px] text-white/20 text-right mt-1">{editBio.length}/280</p>
+          <div className="flex justify-between mt-1">
+            {bioError ? (
+              <p className="text-[10px] text-red-400">{bioError}</p>
+            ) : (
+              <span />
+            )}
+            <p className="text-[10px] text-white/20">{editBio.length}/{MAX_BIO_LENGTH}</p>
+          </div>
         </div>
 
         <div className="flex justify-end pt-4">
           <button
             onClick={handleSave}
-            disabled={isSaving || isPending}
+            disabled={isPending}
             className="px-6 py-2 bg-white text-black text-xs font-medium tracking-widest uppercase rounded-sm hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
-            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
             Save Changes
           </button>
         </div>

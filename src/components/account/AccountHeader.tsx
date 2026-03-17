@@ -14,6 +14,7 @@ interface ProfileData {
 interface AccountHeaderProps {
   insightsProvided?: number;
   initialProfile: ProfileData;
+  userId: string;
   onProfileUpdate?: (profile: ProfileData) => void;
   onError?: (message: string) => void;
 }
@@ -21,6 +22,7 @@ interface AccountHeaderProps {
 export default function AccountHeader({
   insightsProvided = 0,
   initialProfile,
+  userId,
   onProfileUpdate,
   onError,
 }: AccountHeaderProps) {
@@ -40,6 +42,7 @@ export default function AccountHeader({
           <div className="flex justify-between items-end">
             <ProfileCurator
               initialProfile={initialProfile}
+              userId={userId}
               onProfileUpdate={onProfileUpdate}
               onError={onError}
             />
