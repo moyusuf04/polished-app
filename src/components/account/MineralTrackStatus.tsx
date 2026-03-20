@@ -114,7 +114,7 @@ export default function MineralTrackStatus({ categoryProgress, rank, totalXp }: 
                         strokeWidth="2"
                       />
                       <path
-                        className="transition-all duration-1000 ease-out"
+                        className="transition-all duration-[800ms] ease-out"
                         style={{ color: m.light }}
                         strokeDasharray={`${displayProgress}, 100`}
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"

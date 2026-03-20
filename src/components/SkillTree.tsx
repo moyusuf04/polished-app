@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { LessonNode, NodeState } from './LessonNode';
+import { NodeState } from './LessonNode';
 import { PreviewDrawer } from './PreviewDrawer';
+import { HubGrid } from './hub/HubGrid';
 
 export interface LessonData {
   id: string;
@@ -66,19 +67,11 @@ export function SkillTree({ lessons, allLessons, onStartLesson }: Props) {
       {/* Vertical Spine */}
       <div className="absolute left-1/2 top-0 bottom-32 w-[0.5px] bg-white/5 -translate-x-1/2" />
       
-      <div className="flex flex-col items-center w-full relative z-10 transition-all">
-        {lessons.map((lesson, idx) => (
-          <LessonNode
-            key={lesson.id}
-            id={lesson.id}
-            title={lesson.title}
-            category={lesson.category}
-            state={getNodeState(lesson)}
-            onClick={setSelectedLessonId}
-            index={idx}
-          />
-        ))}
-      </div>
+      <HubGrid 
+        lessons={lessons} 
+        getNodeState={getNodeState} 
+        onSelectLesson={setSelectedLessonId} 
+      />
 
       <PreviewDrawer
         isOpen={!!selectedLessonId}

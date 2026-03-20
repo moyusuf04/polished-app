@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock } from 'lucide-react';
 import { NodeState } from './LessonNode';
 import { MINERALS } from '@/lib/design-tokens';
+import { SaveButton } from './shared/SaveButton';
+import { useGuestAuth } from '@/hooks/useGuestAuth';
 
 interface PreviewProps {
   isOpen: boolean;
@@ -22,6 +24,8 @@ interface PreviewProps {
 }
 
 export function PreviewDrawer({ isOpen, onClose, onStart, lesson }: PreviewProps) {
+  const { userId } = useGuestAuth();
+
   // Map category name to mineral key
   const categoryToMineral: Record<string, keyof typeof MINERALS> = {
     'Art': 'malachite',
@@ -62,19 +66,22 @@ export function PreviewDrawer({ isOpen, onClose, onStart, lesson }: PreviewProps
             {/* Mineral Accent Bar */}
             <div className="absolute top-0 left-0 right-0 h-[1px]" style={{ background: `linear-gradient(90deg, transparent, ${m.light}, transparent)` }} />
 
-            <button 
-              onClick={onClose}
-              className="absolute top-6 right-6 p-2 text-white/20 hover:text-white transition"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="absolute top-6 right-6 flex items-center gap-4">
+              {userId && <SaveButton lessonId={lesson.id} userId={userId} />}
+              <button 
+                onClick={onClose}
+                className="p-2 text-white/20 hover:text-white transition"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
             <div className="max-w-lg mx-auto pt-4">
               <div className="mb-8">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-white/30 font-medium block mb-2">
                   {m.label} Track · {lesson.category}
                 </span>
-                <h2 className="text-4xl font-serif mb-6" style={{ color: m.light }}>
+                <h2 className="text-4xl font-serif mb-6 pr-12 leading-tight" style={{ color: m.light }}>
                   {lesson.title}
                 </h2>
                 
@@ -128,3 +135,4 @@ export function PreviewDrawer({ isOpen, onClose, onStart, lesson }: PreviewProps
     </AnimatePresence>
   );
 }
+

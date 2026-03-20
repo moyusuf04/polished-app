@@ -1,11 +1,15 @@
-'use client';
-
-import { useState, useRef, useOptimistic, useTransition } from 'react';
-import { TOKENS } from '@/lib/design-tokens';
+import { useState, useRef, useOptimistic, useTransition, KeyboardEvent } from 'react';
+import { TOKENS, MINERALS } from '@/lib/design-tokens';
 import { createClient } from '@/lib/supabase/client';
+import { updateUserProfile } from '@/lib/actions/user-actions';
 import { Loader2, Camera } from 'lucide-react';
 
 const supabase = createClient();
+
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_NAME_LENGTH = 40;
+const MAX_BIO_LENGTH = 160;
 
 interface ProfileData {
   display_name: string;
@@ -15,17 +19,18 @@ interface ProfileData {
 
 interface ProfileCuratorProps {
   initialProfile: ProfileData;
+  userId: string;
   onProfileUpdate?: (profile: ProfileData) => void;
   onError?: (message: string) => void;
 }
 
 export default function ProfileCurator({
   initialProfile,
+  userId,
   onProfileUpdate,
   onError,
 }: ProfileCuratorProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -33,58 +38,92 @@ export default function ProfileCurator({
   // Optimistic state for instant UI feedback
   const [optimisticProfile, setOptimisticProfile] = useOptimistic<ProfileData>(initialProfile);
 
-  // Local editing state (only used while the edit panel is open)
+  // Local editing state
   const [editName, setEditName] = useState(initialProfile.display_name);
   const [editBio, setEditBio] = useState(initialProfile.bio);
 
+  // Character counter states for bio
+  const bioLength = editBio.length;
+  const charsRemaining = MAX_BIO_LENGTH - bioLength;
+  const isBioWarning = bioLength >= 140;
+
+  // Inline error messages
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [bioError, setBioError] = useState<string | null>(null);
+
+  const validateName = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      setNameError('Display name cannot be empty.');
+      return false;
+    }
+    if (trimmed.length > MAX_NAME_LENGTH) {
+      setNameError(`Display name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+      return false;
+    }
+    setNameError(null);
+    return true;
+  };
+
+  const validateBio = (value: string): boolean => {
+    if (value.length > MAX_BIO_LENGTH) {
+      setBioError(`Bio must be ${MAX_BIO_LENGTH} characters or fewer.`);
+      return false;
+    }
+    setBioError(null);
+    return true;
+  };
+
   const handleSave = async () => {
-    setIsSaving(true);
+    // Client-side validation
+    const nameValid = validateName(editName);
+    const bioValid = validateBio(editBio);
+    if (!nameValid || !bioValid) return;
+
+    const trimmedName = editName.trim();
     const updated: ProfileData = {
       ...optimisticProfile,
-      display_name: editName,
+      display_name: trimmedName,
       bio: editBio,
     };
 
     // Optimistic update
     startTransition(() => setOptimisticProfile(updated));
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      onError?.('You must be signed in to update your profile.');
-      setIsSaving(false);
-      return;
-    }
+    const result = await updateUserProfile(userId, trimmedName, editBio);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        display_name: editName,
-        bio: editBio,
-      })
-      .eq('id', session.user.id);
-
-    if (error) {
-      onError?.(`Profile update failed: ${error.message}`);
-      // Revert optimistic update
+    if (!result.success) {
+      // Rollback optimistic update
       startTransition(() => setOptimisticProfile(initialProfile));
+      if (result.error) {
+        setNameError(result.error);
+      }
     } else {
       onProfileUpdate?.(updated);
+      setIsEditing(false);
     }
+  };
 
-    setIsSaving(false);
-    setIsEditing(false);
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && (e.currentTarget.nodeName === 'INPUT')) {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.currentTarget.nodeName === 'TEXTAREA')) {
+      e.preventDefault();
+      handleSave();
+    }
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-      onError?.('Please select an image file.');
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      onError?.('Only JPEG, PNG, and WebP images are accepted.');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > MAX_AVATAR_SIZE) {
       onError?.('Image must be under 2MB.');
       return;
     }
@@ -99,11 +138,24 @@ export default function ProfileCurator({
     }
 
     const ext = file.name.split('.').pop() || 'jpg';
-    const filePath = `${session.user.id}/avatar.${ext}`;
+    const timestamp = Date.now();
+    const newFilePath = `${session.user.id}/avatar-${timestamp}.${ext}`;
+
+    if (optimisticProfile.avatar_url) {
+      try {
+        const urlParts = optimisticProfile.avatar_url.split('/avatars/');
+        if (urlParts.length > 1) {
+          const oldPath = urlParts[1].split('?')[0];
+          await supabase.storage.from('avatars').remove([oldPath]);
+        }
+      } catch {
+        // Non-critical
+      }
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(filePath, file, { upsert: true, contentType: file.type });
+      .upload(newFilePath, file, { upsert: true, contentType: file.type });
 
     if (uploadError) {
       onError?.(`Avatar upload failed: ${uploadError.message}`);
@@ -113,10 +165,12 @@ export default function ProfileCurator({
 
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
-      .getPublicUrl(filePath);
+      .getPublicUrl(newFilePath);
 
-    // Append cache-buster to force re-render
-    const freshUrl = `${publicUrl}?t=${Date.now()}`;
+    const freshUrl = `${publicUrl}?t=${timestamp}`;
+
+    const updated: ProfileData = { ...optimisticProfile, avatar_url: freshUrl };
+    startTransition(() => setOptimisticProfile(updated));
 
     const { error: updateError } = await supabase
       .from('profiles')
@@ -124,30 +178,29 @@ export default function ProfileCurator({
       .eq('id', session.user.id);
 
     if (updateError) {
+      startTransition(() => setOptimisticProfile(initialProfile));
       onError?.(`Avatar save failed: ${updateError.message}`);
     } else {
-      const updated: ProfileData = { ...optimisticProfile, avatar_url: freshUrl };
-      startTransition(() => setOptimisticProfile(updated));
       onProfileUpdate?.(updated);
     }
 
     setIsUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
   };
 
-  // Hidden file input
   const triggerFileSelect = () => fileRef.current?.click();
 
-  // --- VIEW MODE ---
   if (!isEditing) {
     return (
       <div className="flex flex-col md:flex-row gap-8 items-start md:items-center relative z-10 group">
         <div className="relative">
           <div
-            className="w-24 h-24 rounded-sm border flex items-center justify-center overflow-hidden transition-all duration-300"
+            className="w-24 h-24 rounded-sm border flex items-center justify-center overflow-hidden transition-all duration-300 cursor-pointer"
             style={{
               borderColor: TOKENS.subtle,
               backgroundColor: TOKENS.graphite,
             }}
+            onClick={triggerFileSelect}
           >
             {optimisticProfile.avatar_url ? (
               <img
@@ -160,15 +213,24 @@ export default function ProfileCurator({
                 {optimisticProfile.display_name?.charAt(0) || '?'}
               </span>
             )}
-            {isUploading && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploading ? (
                 <Loader2 className="w-5 h-5 text-white animate-spin" />
-              </div>
-            )}
+              ) : (
+                <Camera className="w-5 h-5 text-white" />
+              )}
+            </div>
           </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
           <button
             onClick={() => setIsEditing(true)}
-            className="absolute -right-2 -bottom-2 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+            className="absolute -right-2 -bottom-2 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-lg transition-all"
             aria-label="Edit Profile"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -181,7 +243,7 @@ export default function ProfileCurator({
           <h1 className="font-serif text-4xl md:text-5xl text-white mb-3 tracking-tight">
             {optimisticProfile.display_name || 'Anonymous'}
           </h1>
-          <p className="font-sans font-light text-base text-white/60 max-w-xl leading-relaxed">
+          <p className="font-sans font-light text-base text-white/60 max-w-xl leading-relaxed whitespace-pre-wrap">
             {optimisticProfile.bio || 'No bio set yet.'}
           </p>
         </div>
@@ -189,10 +251,9 @@ export default function ProfileCurator({
     );
   }
 
-  // --- EDIT MODE ---
   return (
     <div
-      className="p-6 md:p-8 border rounded-sm relative z-10 animate-in fade-in duration-300"
+      className="p-6 md:p-8 border rounded-sm relative z-10 animate-in fade-in duration-300 w-full max-w-xl"
       style={{ borderColor: TOKENS.hairline, backgroundColor: 'rgba(255,255,255,0.02)' }}
     >
       <div className="flex justify-between items-center mb-6">
@@ -203,6 +264,8 @@ export default function ProfileCurator({
           onClick={() => {
             setEditName(optimisticProfile.display_name);
             setEditBio(optimisticProfile.bio);
+            setNameError(null);
+            setBioError(null);
             setIsEditing(false);
           }}
           className="text-xs uppercase tracking-widest text-white/50 hover:text-white transition-colors"
@@ -212,7 +275,6 @@ export default function ProfileCurator({
       </div>
 
       <div className="space-y-6">
-        {/* Avatar Upload */}
         <div className="flex items-center gap-6">
           <div
             className="w-20 h-20 rounded-sm border flex items-center justify-center overflow-hidden relative cursor-pointer group/avatar"
@@ -237,54 +299,75 @@ export default function ProfileCurator({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={handleAvatarUpload}
           />
           <div>
-            <p className="text-xs text-white/50">Click to upload avatar</p>
-            <p className="text-[10px] text-white/30 mt-1">Max 2MB • JPG, PNG, WebP</p>
+            <p className="text-xs text-white/50">Avatar selection</p>
+            <p className="text-[10px] text-white/30 mt-1">2MB Limit • Professional assets only</p>
           </div>
         </div>
 
-        {/* Name */}
         <div>
           <label className="block text-xs uppercase tracking-wider text-white/50 mb-2">Display Name</label>
           <input
             type="text"
             value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            maxLength={50}
+            onKeyDown={handleKeyPress}
+            onChange={(e) => {
+              setEditName(e.target.value);
+              if (nameError) validateName(e.target.value);
+            }}
+            maxLength={MAX_NAME_LENGTH}
             className="w-full bg-transparent border-b p-2 font-serif text-2xl text-white outline-none focus:border-white transition-colors"
-            style={{ borderColor: TOKENS.subtle }}
+            style={{ borderColor: nameError ? '#ef4444' : TOKENS.subtle }}
           />
+          {nameError && (
+            <p className="text-[10px] text-red-400 mt-1">{nameError}</p>
+          )}
         </div>
 
-        {/* Bio */}
         <div>
           <label className="block text-xs uppercase tracking-wider text-white/50 mb-2">Executive Bio</label>
           <textarea
             value={editBio}
-            onChange={(e) => setEditBio(e.target.value)}
+            onKeyDown={handleKeyPress}
+            onChange={(e) => {
+              if (e.target.value.length <= MAX_BIO_LENGTH) {
+                setEditBio(e.target.value);
+                if (bioError) validateBio(e.target.value);
+              }
+            }}
             rows={3}
-            maxLength={280}
             className="w-full bg-transparent border p-3 font-sans font-light text-sm text-white/80 outline-none focus:border-white/50 rounded-sm transition-colors resize-none"
-            style={{ borderColor: TOKENS.hairline }}
+            style={{ borderColor: bioError ? '#ef4444' : TOKENS.hairline }}
           />
-          <p className="text-[10px] text-white/20 text-right mt-1">{editBio.length}/280</p>
+          <div className="flex justify-between items-center mt-2">
+            <div>
+              {bioError ? (
+                <p className="text-[10px] text-red-400">{bioError}</p>
+              ) : (
+                <span className="text-[10px] text-white/20 tracking-wide uppercase font-medium">Cmd+Enter to save.</span>
+              )}
+            </div>
+            <p className="text-xs font-mono font-bold tracking-tight" style={{ color: isBioWarning ? MINERALS.tigersEye.light : 'rgba(255,255,255,0.2)' }}>
+              {charsRemaining}
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end pt-4">
           <button
             onClick={handleSave}
-            disabled={isSaving || isPending}
-            className="px-6 py-2 bg-white text-black text-xs font-medium tracking-widest uppercase rounded-sm hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            disabled={isPending}
+            className="px-8 py-3 bg-white text-black text-[10px] font-bold tracking-[0.2em] uppercase rounded-sm hover:bg-white/90 transition-all disabled:opacity-50 flex items-center gap-2 border-b-2 border-zinc-300 active:border-b-0 active:translate-y-[2px]"
           >
-            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-            Save Changes
+            {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Update Identity'}
           </button>
         </div>
       </div>
     </div>
   );
 }
+

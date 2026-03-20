@@ -1,10 +1,30 @@
 import { InteractiveReader } from "@/components/InteractiveReader";
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export default async function LessonPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = await createClient();
+
+  // 1. Auth check for the 3-lesson wall
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  // Count completed lessons for this user
+  let completedCount = 0;
+  if (user) {
+    const { count } = await supabase
+      .from('user_progress')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+    completedCount = count || 0;
+  }
+
+  const isAnonymous = !user || user.is_anonymous;
+  const isSignupRequired = completedCount >= 3 && isAnonymous;
+
+  if (isSignupRequired) {
+    redirect('/auth/signup?reason=limit-reached');
+  }
 
   // Find lesson by ID
   const { data: lesson } = await supabase
@@ -35,9 +55,6 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
         category={(lesson.category as any)?.name || 'Unknown'}
         difficulty={lesson.difficulty || 'Level 1: Foundation'}
         lessonData={formattedLesson}
-        onBack={() => {
-          window.location.href = '/hub';
-        }}
       />
     </main>
   );
