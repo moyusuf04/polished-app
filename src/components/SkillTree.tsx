@@ -35,12 +35,24 @@ export function SkillTree({ lessons, allLessons, onStartLesson }: Props) {
     if (lesson.completed) return 'completed';
 
     // A lesson is unlocked only if ALL prerequisites across ALL categories are completed
-    const allPrereqsMet = lesson.prerequisites.every((prereqId) => {
-      const p = allLessons.find((l) => l.id === prereqId);
-      return p?.completed === true;
-    });
+    // Recursive Prerequisite Validation
+    const areAllPrereqsMetRecursive = (lessonId: string, visited = new Set<string>()): boolean => {
+      if (visited.has(lessonId)) return true; // prevent infinite loop if cycle exists somehow
+      visited.add(lessonId);
+      
+      const current = allLessons.find(l => l.id === lessonId);
+      if (!current) return true;
+      
+      return current.prerequisites.every(prereqId => {
+        const prereq = allLessons.find(l => l.id === prereqId);
+        if (!prereq) return true;
+        return prereq.completed && areAllPrereqsMetRecursive(prereqId, visited);
+      });
+    };
 
-    return allPrereqsMet ? 'unlocked' : 'locked';
+    const allPrereqsMet = areAllPrereqsMetRecursive(lesson.id);
+
+    return allPrereqsMet ? 'unlocked' : 'prerequisite_locked';
   };
 
   const getLockedReason = (lesson: LessonData): string | undefined => {
@@ -51,9 +63,9 @@ export function SkillTree({ lessons, allLessons, onStartLesson }: Props) {
   };
 
   const selectedLesson = allLessons.find((l) => l.id === selectedLessonId);
-  const selectedLessonState = selectedLesson ? getNodeState(selectedLesson) : 'locked';
+  const selectedLessonState = selectedLesson ? getNodeState(selectedLesson) : 'prerequisite_locked';
 
-  // Empty State
+    // Empty State
   if (lessons.length === 0) {
     return (
       <div className="w-full flex-1 flex items-center justify-center p-12">

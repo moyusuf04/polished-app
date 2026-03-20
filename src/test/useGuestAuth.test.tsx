@@ -8,7 +8,10 @@ vi.mock('@/lib/supabase/client', () => ({
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
       signInAnonymously: vi.fn().mockResolvedValue({ data: { user: { id: 'anon-123' } } })
-    }
+    },
+    from: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockResolvedValue({ data: [], count: 0, error: null })
   })
 }));
 

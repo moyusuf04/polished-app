@@ -28,20 +28,33 @@ const ONBOARDING_MAP: Record<string, string> = {
 };
 
 export function PodHub({ lessons, categories, onSelectLesson, initialSelection }: Props) {
+  // Only show categories that have at least one published lesson
+  const populatedCategories = categories.filter(cat => 
+    lessons.some(l => l.category_id === cat.id && !l.completed) || // Show if has lessons
+    lessons.some(l => l.category_id === cat.id) // Fallback to any lessons if all completed
+  ).filter(cat => lessons.some(l => l.category_id === cat.id)); // Hard filter for any lessons
+
   const [activeCategoryId, setActiveCategoryId] = useState<string>(() => {
     if (initialSelection && categories.length > 0) {
       const targetCategoryName = ONBOARDING_MAP[initialSelection];
-      const match = categories.find(c => c.name === targetCategoryName || c.name.toLowerCase().includes(initialSelection.toLowerCase()));
+      
+      // 1. Exact Name Match
+      let match = categories.find(c => c.name === targetCategoryName);
       if (match) return match.id;
+
+      // 2. Substring Match (Case-insensitive)
+      match = categories.find(c => c.name.toLowerCase().includes(initialSelection.toLowerCase()));
+      if (match) return match.id;
+
+      // 3. Fallback to first available category
+      return categories[0]?.id || '';
     }
     return categories[0]?.id || '';
   });
   
-  // Keep the active category ID in sync if categories load late and haven't been set by selection
+  // Keep the active category ID in sync if categories load late
   if (!activeCategoryId && categories.length > 0) {
-    const targetCategoryName = initialSelection ? ONBOARDING_MAP[initialSelection] : null;
-    const match = targetCategoryName ? categories.find(c => c.name === targetCategoryName) : null;
-    setActiveCategoryId(match?.id || categories[0].id);
+    setActiveCategoryId(categories[0].id);
   }
 
   const activeLessons = lessons.filter(l => l.category_id === activeCategoryId);
@@ -55,7 +68,7 @@ export function PodHub({ lessons, categories, onSelectLesson, initialSelection }
 
       <div className="w-full max-w-full overflow-x-auto no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-4 mb-12">
         <div className="flex flex-row items-center gap-3 px-2 w-max mx-auto">
-          {categories.map(cat => (
+          {populatedCategories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setActiveCategoryId(cat.id)}

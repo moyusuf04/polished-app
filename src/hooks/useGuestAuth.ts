@@ -41,6 +41,7 @@ export function useGuestAuth() {
       }
 
       setUserId(currentUserId);
+      setGuestId(currentUserId); // In guest mode, userId acts as guestId
       setStatus(currentStatus);
 
       // Load completed lessons count

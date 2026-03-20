@@ -40,80 +40,54 @@ export default function HubPage() {
       setOnboardingSelection(savedSelection);
     }
     async function fetchHubData() {
-      // 1. Get Session & Progress
+      // 1. Get Session for User Identity
       const { data: { session } } = await supabase.auth.getSession();
-      let completedIds = new Set<string>();
-      if (session) {
-        const { data: progressData } = await supabase
-          .from('user_progress')
-          .select('lesson_id')
-          .eq('user_id', session.user.id);
-        completedIds = new Set(progressData?.map(p => p.lesson_id) || []);
+      const currentUserId = session?.user?.id;
+      
+      // 2. Hydrate Hub via a Single RPC (Reduced Round-trips Logic)
+      // This is Task 5: Hydration Optimisation
+      const { data: hubData, error: hubErr } = await supabase
+        .rpc('get_hydrated_hub', { p_user_id: currentUserId });
 
-        // Check for admin role
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (profile?.role === 'admin') {
-          setIsAdmin(true);
-        }
+      if (hubErr) {
+        console.error('Failed to fetch hydrated hub:', hubErr);
+        setIsLoading(false);
+        return;
       }
 
-      // 2. Fetch Categories
-      const { data: catData } = await supabase
-        .from('categories')
-        .select('*')
-        .is('deleted_at', null)
-        .order('name');
+      if (hubData) {
+        const { categories: catData, lessons: lessonData, prerequisites: prereqData, completed_ids, user_role } = hubData as any;
         
-      if (catData) setCategories(catData as CategoryData[]);
+        const completedIds = new Set<string>(completed_ids || []);
+        setIsAdmin(user_role === 'admin');
+        setCategories(catData as CategoryData[]);
 
-      // 3. Fetch Published Lessons
-      const { data: lessonData } = await supabase
-        .from('lessons')
-        .select('*, duration, format, xp_reward')
-        .eq('status', 'published')
-        .is('deleted_at', null)
-        .order('position');
-
-      // 4. Fetch Prerequisites
-      const { data: prereqData } = await supabase
-        .from('lesson_prerequisites')
-        .select('lesson_id, prerequisite_id');
-
-      // 5. Hydrate LessonData
-      if (lessonData && catData) {
-        const hydratedLessons: LessonData[] = lessonData.map(lesson => {
-          // Find category name
-          const cat = catData.find(c => c.id === lesson.category_id);
-          
-          // Find prerequisites
-          const prereqs = prereqData
-            ?.filter(p => p.lesson_id === lesson.id)
-            ?.map(p => p.prerequisite_id) || [];
+        // 3. Hydrate LessonData locally with complete state (Type-Safe Content Guards)
+        const hydratedLessons: LessonData[] = (lessonData || []).map((lesson: any) => {
+          const cat = catData.find((c: any) => c.id === lesson.category_id);
+          const prereqs = (prereqData || [])
+            .filter((p: any) => p.lesson_id === lesson.id)
+            .map((p: any) => p.prerequisite_id);
 
           return {
-            id: lesson.id,
-            title: lesson.title,
-            category_id: lesson.category_id,
+            id: lesson.id || 'unknown-lesson',
+            title: lesson.title || 'Untitled Lesson',
+            category_id: lesson.category_id || '',
             category: cat?.name || 'Unknown',
             difficulty: lesson.difficulty || 'Level 1: Foundation',
             description: lesson.description || '',
+            prerequisites: prereqs,
+            completed: completedIds.has(lesson.id),
+            content_slides: lesson.content_slides || [],
             convo_hooks: lesson.convo_hooks || [],
             reflection_prompt: lesson.reflection_prompt || 'What is your take?',
-            content_slides: lesson.content_slides || [],
-            prerequisites: prereqs,
             position: lesson.position || 0,
-            duration: lesson.duration,
-            format: lesson.format,
-            xp_reward: lesson.xp_reward,
-            completed: completedIds.has(lesson.id)
+            duration: lesson.duration || '',
+            format: lesson.format || '',
+            xp_reward: lesson.xp_reward || 0,
           };
         });
-        
+
         setLessons(hydratedLessons);
       }
       
@@ -136,6 +110,19 @@ export default function HubPage() {
     router.push('/');
   };
 
+  const handleSignupRedirect = (e: React.MouseEvent) => {
+    // 4. Anonymous-to-Permanent Data Integrity Logic
+    // Validate guestId against local storage to prevent mismatched RPC migrations
+    const localId = localStorage.getItem('guestId');
+    if (guestId && localId && guestId !== localId) {
+      console.warn('Guest ID mismatch detected. Favoring ephemeral session ID for accuracy.');
+      // Update local storage to match the session if they drifted
+      localStorage.setItem('guestId', guestId);
+    }
+    
+    // Continue with natural navigation
+  };
+
 
   if (isLoading) {
     return (
@@ -156,7 +143,6 @@ export default function HubPage() {
           category={lesson.category}
           difficulty={lesson.difficulty}
           lessonData={lesson}
-          onBack={handleBackToHub}
         />
       </main>
     );
@@ -222,6 +208,7 @@ export default function HubPage() {
              <div className="w-full space-y-6">
                <Link 
                   href={guestId ? `/signup?origin_guest_id=${guestId}` : "/signup"}
+                  onClick={handleSignupRedirect}
                   className="block w-full py-5 bg-white text-black text-[11px] font-bold tracking-[0.25em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 transition-all shadow-xl shadow-white/5"
                 >
                   Create account
