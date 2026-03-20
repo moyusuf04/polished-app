@@ -1,9 +1,7 @@
-'use client';
-
-import { useState, useRef, useOptimistic, useTransition } from 'react';
-import { TOKENS } from '@/lib/design-tokens';
+import { useState, useRef, useOptimistic, useTransition, KeyboardEvent } from 'react';
+import { TOKENS, MINERALS } from '@/lib/design-tokens';
 import { createClient } from '@/lib/supabase/client';
-import { updateUserProfile } from '@/actions/account-actions';
+import { updateUserProfile } from '@/lib/actions/user-actions';
 import { Loader2, Camera } from 'lucide-react';
 
 const supabase = createClient();
@@ -40,11 +38,16 @@ export default function ProfileCurator({
   // Optimistic state for instant UI feedback
   const [optimisticProfile, setOptimisticProfile] = useOptimistic<ProfileData>(initialProfile);
 
-  // Local editing state (only used while the edit panel is open)
+  // Local editing state
   const [editName, setEditName] = useState(initialProfile.display_name);
   const [editBio, setEditBio] = useState(initialProfile.bio);
 
-  // Inline error messages per field
+  // Character counter states for bio
+  const bioLength = editBio.length;
+  const charsRemaining = MAX_BIO_LENGTH - bioLength;
+  const isBioWarning = bioLength >= 140;
+
+  // Inline error messages
   const [nameError, setNameError] = useState<string | null>(null);
   const [bioError, setBioError] = useState<string | null>(null);
 
@@ -84,13 +87,10 @@ export default function ProfileCurator({
       bio: editBio,
     };
 
-    // Optimistic update — user sees change instantly
+    // Optimistic update
     startTransition(() => setOptimisticProfile(updated));
 
-    const result = await updateUserProfile(userId, {
-      display_name: trimmedName,
-      bio: editBio,
-    });
+    const result = await updateUserProfile(userId, trimmedName, editBio);
 
     if (!result.success) {
       // Rollback optimistic update
@@ -104,16 +104,25 @@ export default function ProfileCurator({
     }
   };
 
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && (e.currentTarget.nodeName === 'INPUT')) {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.currentTarget.nodeName === 'TEXTAREA')) {
+      e.preventDefault();
+      handleSave();
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       onError?.('Only JPEG, PNG, and WebP images are accepted.');
       return;
     }
-    // Validate file size
     if (file.size > MAX_AVATAR_SIZE) {
       onError?.('Image must be under 2MB.');
       return;
@@ -132,17 +141,15 @@ export default function ProfileCurator({
     const timestamp = Date.now();
     const newFilePath = `${session.user.id}/avatar-${timestamp}.${ext}`;
 
-    // Delete previous avatar if exists
     if (optimisticProfile.avatar_url) {
       try {
-        // Extract file path from the public URL
         const urlParts = optimisticProfile.avatar_url.split('/avatars/');
         if (urlParts.length > 1) {
-          const oldPath = urlParts[1].split('?')[0]; // strip cache-buster
+          const oldPath = urlParts[1].split('?')[0];
           await supabase.storage.from('avatars').remove([oldPath]);
         }
       } catch {
-        // Non-critical — old file may not exist
+        // Non-critical
       }
     }
 
@@ -160,10 +167,8 @@ export default function ProfileCurator({
       .from('avatars')
       .getPublicUrl(newFilePath);
 
-    // Append cache-buster to force re-render
     const freshUrl = `${publicUrl}?t=${timestamp}`;
 
-    // Optimistic update
     const updated: ProfileData = { ...optimisticProfile, avatar_url: freshUrl };
     startTransition(() => setOptimisticProfile(updated));
 
@@ -173,7 +178,6 @@ export default function ProfileCurator({
       .eq('id', session.user.id);
 
     if (updateError) {
-      // Rollback
       startTransition(() => setOptimisticProfile(initialProfile));
       onError?.(`Avatar save failed: ${updateError.message}`);
     } else {
@@ -181,14 +185,11 @@ export default function ProfileCurator({
     }
 
     setIsUploading(false);
-    // Reset file input so re-selecting the same file triggers onChange
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  // Hidden file input
   const triggerFileSelect = () => fileRef.current?.click();
 
-  // --- VIEW MODE ---
   if (!isEditing) {
     return (
       <div className="flex flex-col md:flex-row gap-8 items-start md:items-center relative z-10 group">
@@ -212,7 +213,6 @@ export default function ProfileCurator({
                 {optimisticProfile.display_name?.charAt(0) || '?'}
               </span>
             )}
-            {/* Upload overlay */}
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               {isUploading ? (
                 <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -230,7 +230,7 @@ export default function ProfileCurator({
           />
           <button
             onClick={() => setIsEditing(true)}
-            className="absolute -right-2 -bottom-2 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+            className="absolute -right-2 -bottom-2 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-lg transition-all"
             aria-label="Edit Profile"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -243,7 +243,7 @@ export default function ProfileCurator({
           <h1 className="font-serif text-4xl md:text-5xl text-white mb-3 tracking-tight">
             {optimisticProfile.display_name || 'Anonymous'}
           </h1>
-          <p className="font-sans font-light text-base text-white/60 max-w-xl leading-relaxed">
+          <p className="font-sans font-light text-base text-white/60 max-w-xl leading-relaxed whitespace-pre-wrap">
             {optimisticProfile.bio || 'No bio set yet.'}
           </p>
         </div>
@@ -251,10 +251,9 @@ export default function ProfileCurator({
     );
   }
 
-  // --- EDIT MODE ---
   return (
     <div
-      className="p-6 md:p-8 border rounded-sm relative z-10 animate-in fade-in duration-300"
+      className="p-6 md:p-8 border rounded-sm relative z-10 animate-in fade-in duration-300 w-full max-w-xl"
       style={{ borderColor: TOKENS.hairline, backgroundColor: 'rgba(255,255,255,0.02)' }}
     >
       <div className="flex justify-between items-center mb-6">
@@ -276,7 +275,6 @@ export default function ProfileCurator({
       </div>
 
       <div className="space-y-6">
-        {/* Avatar Upload */}
         <div className="flex items-center gap-6">
           <div
             className="w-20 h-20 rounded-sm border flex items-center justify-center overflow-hidden relative cursor-pointer group/avatar"
@@ -306,17 +304,17 @@ export default function ProfileCurator({
             onChange={handleAvatarUpload}
           />
           <div>
-            <p className="text-xs text-white/50">Click to upload avatar</p>
-            <p className="text-[10px] text-white/30 mt-1">Max 2MB • JPG, PNG, WebP</p>
+            <p className="text-xs text-white/50">Avatar selection</p>
+            <p className="text-[10px] text-white/30 mt-1">2MB Limit • Professional assets only</p>
           </div>
         </div>
 
-        {/* Name */}
         <div>
           <label className="block text-xs uppercase tracking-wider text-white/50 mb-2">Display Name</label>
           <input
             type="text"
             value={editName}
+            onKeyDown={handleKeyPress}
             onChange={(e) => {
               setEditName(e.target.value);
               if (nameError) validateName(e.target.value);
@@ -325,37 +323,37 @@ export default function ProfileCurator({
             className="w-full bg-transparent border-b p-2 font-serif text-2xl text-white outline-none focus:border-white transition-colors"
             style={{ borderColor: nameError ? '#ef4444' : TOKENS.subtle }}
           />
-          <div className="flex justify-between mt-1">
-            {nameError ? (
-              <p className="text-[10px] text-red-400">{nameError}</p>
-            ) : (
-              <span />
-            )}
-            <p className="text-[10px] text-white/20">{editName.trim().length}/{MAX_NAME_LENGTH}</p>
-          </div>
+          {nameError && (
+            <p className="text-[10px] text-red-400 mt-1">{nameError}</p>
+          )}
         </div>
 
-        {/* Bio */}
         <div>
           <label className="block text-xs uppercase tracking-wider text-white/50 mb-2">Executive Bio</label>
           <textarea
             value={editBio}
+            onKeyDown={handleKeyPress}
             onChange={(e) => {
-              setEditBio(e.target.value);
-              if (bioError) validateBio(e.target.value);
+              if (e.target.value.length <= MAX_BIO_LENGTH) {
+                setEditBio(e.target.value);
+                if (bioError) validateBio(e.target.value);
+              }
             }}
             rows={3}
-            maxLength={MAX_BIO_LENGTH}
             className="w-full bg-transparent border p-3 font-sans font-light text-sm text-white/80 outline-none focus:border-white/50 rounded-sm transition-colors resize-none"
             style={{ borderColor: bioError ? '#ef4444' : TOKENS.hairline }}
           />
-          <div className="flex justify-between mt-1">
-            {bioError ? (
-              <p className="text-[10px] text-red-400">{bioError}</p>
-            ) : (
-              <span />
-            )}
-            <p className="text-[10px] text-white/20">{editBio.length}/{MAX_BIO_LENGTH}</p>
+          <div className="flex justify-between items-center mt-2">
+            <div>
+              {bioError ? (
+                <p className="text-[10px] text-red-400">{bioError}</p>
+              ) : (
+                <span className="text-[10px] text-white/20 tracking-wide uppercase font-medium">Cmd+Enter to save.</span>
+              )}
+            </div>
+            <p className="text-xs font-mono font-bold tracking-tight" style={{ color: isBioWarning ? MINERALS.tigersEye.light : 'rgba(255,255,255,0.2)' }}>
+              {charsRemaining}
+            </p>
           </div>
         </div>
 
@@ -363,12 +361,13 @@ export default function ProfileCurator({
           <button
             onClick={handleSave}
             disabled={isPending}
-            className="px-6 py-2 bg-white text-black text-xs font-medium tracking-widest uppercase rounded-sm hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-8 py-3 bg-white text-black text-[10px] font-bold tracking-[0.2em] uppercase rounded-sm hover:bg-white/90 transition-all disabled:opacity-50 flex items-center gap-2 border-b-2 border-zinc-300 active:border-b-0 active:translate-y-[2px]"
           >
-            Save Changes
+            {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Update Identity'}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
