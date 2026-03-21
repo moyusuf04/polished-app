@@ -2,7 +2,7 @@ import { Check, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { MINERALS } from '@/lib/design-tokens';
 
-export type NodeState = 'completed' | 'unlocked' | 'locked';
+export type NodeState = 'completed' | 'unlocked' | 'locked' | 'prerequisite_locked';
 
 interface Props {
   id: string;
@@ -51,6 +51,7 @@ export function LessonNode({ id, title, category, state, onClick, index }: Props
       />
     );
   } else {
+    // locked or prerequisite_locked
     buttonClass += ` bg-white/5 opacity-40 cursor-not-allowed`;
     innerContent = <Lock className="w-4 h-4 text-white/30" />;
   }
@@ -61,11 +62,13 @@ export function LessonNode({ id, title, category, state, onClick, index }: Props
     ? `linear-gradient(135deg, ${m.dark}, ${m.light}88)`
     : "rgba(255,255,255,0.04)";
 
+  const isLocked = state === 'locked' || state === 'prerequisite_locked';
+
   return (
     <div 
       className={`flex items-center gap-6 py-6 cursor-pointer w-full max-w-sm ${isLeft ? 'flex-row' : 'flex-row-reverse'}`}
-      style={{ opacity: state === 'locked' ? 0.35 : 1 }}
-      onClick={() => state !== 'locked' && onClick(id)}
+      style={{ opacity: isLocked ? 0.35 : 1 }}
+      onClick={() => !isLocked && onClick(id)}
     >
       <div className={`flex-1 ${isLeft ? 'text-right' : 'text-left'}`}>
         <p className={`font-serif text-sm leading-tight transition-colors ${state === 'unlocked' ? '' : 'text-white/70'}`} style={{ color: state === 'unlocked' ? m.light : undefined }}>
@@ -90,3 +93,4 @@ export function LessonNode({ id, title, category, state, onClick, index }: Props
     </div>
   );
 }
+

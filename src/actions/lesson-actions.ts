@@ -63,9 +63,21 @@ export async function getLessons(opts: {
 export async function getLesson(id: string): Promise<ActionResult> {
   await requireAdmin();
   const supabase = await createClient();
-  const { data, error } = await supabase.from('lessons').select('*').eq('id', id).single();
+  
+  // Fetch lesson data and its junction categories
+  const { data, error } = await supabase
+    .from('lessons')
+    .select('*, lesson_categories(category_id)')
+    .eq('id', id)
+    .single();
+    
   if (error) return { success: false, error: error.message };
-  return { success: true, data };
+  
+  // Transform lesson_categories into a simple string array
+  const category_ids = (data.lesson_categories as Array<{ category_id: string }>)
+    ?.map(c => c.category_id) || [];
+    
+  return { success: true, data: { ...data, category_ids } };
 }
 
 export async function createLesson(input: Record<string, unknown>): Promise<ActionResult> {
@@ -99,7 +111,12 @@ export async function createLesson(input: Record<string, unknown>): Promise<Acti
   const { data, error } = await supabase.from('lessons').insert(lessonRow).select().single();
   if (error) return { success: false, error: error.message };
 
-  await logAdminAction('create', 'lesson', slug, { title: parsed.data.title });
+  // Sync lesson_categories
+  const catIds = parsed.data.category_ids || [parsed.data.category_id];
+  const junctionRows = catIds.map(cid => ({ lesson_id: slug, category_id: cid }));
+  await supabase.from('lesson_categories').insert(junctionRows);
+
+  await logAdminAction('create', 'lesson', slug, { title: parsed.data.title, category_ids: catIds });
   revalidatePath('/admin');
   revalidatePath('/admin/lessons');
   revalidatePath('/hub');
@@ -124,11 +141,18 @@ export async function updateLesson(id: string, input: Record<string, unknown>): 
     await snapshotVersion(id, current);
   }
 
-  const { id: _id, ...updates } = parsed.data;
+  const { id: _id, category_ids, ...updates } = parsed.data;
   const { data, error } = await supabase.from('lessons').update(updates).eq('id', id).select().single();
   if (error) return { success: false, error: error.message };
 
-  await logAdminAction('update', 'lesson', id, updates);
+  // Sync lesson_categories: Delete existing and insert new
+  if (category_ids) {
+    await supabase.from('lesson_categories').delete().eq('lesson_id', id);
+    const junctionRows = category_ids.map(cid => ({ lesson_id: id, category_id: cid }));
+    await supabase.from('lesson_categories').insert(junctionRows);
+  }
+
+  await logAdminAction('update', 'lesson', id, { ...updates, category_ids });
   revalidatePath('/admin');
   revalidatePath('/admin/lessons');
   revalidatePath('/hub');

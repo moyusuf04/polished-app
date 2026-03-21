@@ -35,6 +35,7 @@ export default function LessonEditorPage() {
   const [duration, setDuration] = useState('');
   const [format, setFormat] = useState('');
   const [xpReward, setXpReward] = useState<number>(0);
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [versions, setVersions] = useState<VersionItem[]>([]);
   const [showVersions, setShowVersions] = useState(false);
@@ -65,6 +66,7 @@ export default function LessonEditorPage() {
            setDuration(l.duration as string ?? '');
            setFormat(l.format as string ?? '');
            setXpReward(l.xp_reward as number ?? 0);
+           setCategoryIds((l.category_ids as string[]) ?? []);
          }
 
         const verResult = await getLessonVersions(lessonId);
@@ -84,13 +86,14 @@ export default function LessonEditorPage() {
         description,
         content_slides: slides,
         reflection_prompt: reflectionPrompt,
-         convo_hooks: convoHooks.filter(h => h.trim()),
-         status,
-         cover_image_url: coverImageUrl,
-         duration,
-         format,
-         xp_reward: xpReward,
-       };
+        convo_hooks: convoHooks.filter(h => h.trim()),
+        status,
+        cover_image_url: coverImageUrl,
+        duration,
+        format,
+        xp_reward: xpReward,
+        category_ids: categoryIds,
+      };
 
       const result = isNew ? await createLesson(input) : await updateLesson(lessonId, input);
       if (result.success) {
@@ -187,12 +190,34 @@ export default function LessonEditorPage() {
             <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-zinc-600" placeholder="e.g. Monet's Water Lilies" />
             {title && <p className="text-xs text-zinc-600 mt-1">Slug: {generateSlug(title)}</p>}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-2">Category</label>
-            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-xl px-4 py-3 outline-none">
-              <option value="">Select...</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-zinc-400 mb-2">Categories (Select one or more)</label>
+            <div className="flex flex-wrap gap-2 p-3 bg-zinc-900 border border-zinc-700 rounded-xl">
+              {categories.map(c => {
+                const isSelected = categoryIds.includes(c.id) || categoryId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      if (categoryIds.includes(c.id)) {
+                        setCategoryIds(prev => prev.filter(id => id !== c.id));
+                      } else {
+                        setCategoryIds(prev => [...prev, c.id]);
+                        if (!categoryId) setCategoryId(c.id);
+                      }
+                    }}
+                    type="button"
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all ${
+                      isSelected 
+                        ? 'bg-white text-black border-white' 
+                        : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60'
+                    } border`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-2">Difficulty</label>

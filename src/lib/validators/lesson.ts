@@ -8,7 +8,8 @@ const slideSchema = z.object({
 
 export const lessonCreateSchema = z.object({
   title: z.string().trim().min(5, 'Title must be at least 5 characters').max(120, 'Title must be 120 characters or less'),
-  category_id: z.string().uuid('Select a valid category'),
+  category_id: z.string().min(1, 'Select a primary category'),
+  category_ids: z.array(z.string()).optional(),
   difficulty: z.enum(['Level 1: Foundation', 'Level 2: Intermediate', 'Level 3: Advanced']),
   description: z.string().trim().max(300, 'Description must be 300 characters or less').optional(),
   content_slides: z.array(slideSchema).min(1, 'At least one slide is required'),
