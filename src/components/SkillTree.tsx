@@ -7,6 +7,7 @@ export interface LessonData {
   id: string;
   title: string;
   category_id: string;
+  category_ids?: string[]; // Multiple categories for hybrid nodes
   category: string;
   difficulty: string;
   description: string;

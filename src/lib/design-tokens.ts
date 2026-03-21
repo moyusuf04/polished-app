@@ -58,3 +58,14 @@ export const TOKENS = {
 } as const;
 
 export type MineralKey = keyof typeof MINERALS;
+
+// Hub StatusBar: Simplified 3-tier public badge.
+// NOTE: The Account Page uses the detailed 6-mineral rank system (MINERALS above).
+// These two systems coexist intentionally — do not conflate them.
+export const MINERAL_GRADES = {
+  quartz:  { label: 'Quartz',  color: '#C4B5A0', minXp: 0 },
+  emerald: { label: 'Emerald', color: '#52B788', minXp: 1000 },
+  diamond: { label: 'Diamond', color: '#B9D6F2', minXp: 5000 },
+} as const;
+
+export type MineralGradeKey = keyof typeof MINERAL_GRADES;

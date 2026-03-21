@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, Lightbulb, X, Sparkles, Loader2, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLessonSlides } from '@/hooks/useLessonSlides';
@@ -23,6 +24,7 @@ interface Props {
     convo_hooks: string[];
     reflection_prompt: string;
   };
+  onClose?: () => void;
 }
 
 const dopamineCues = [
@@ -33,7 +35,7 @@ const dopamineCues = [
   "Final step"
 ];
 
-export function InteractiveReader({ title, category, difficulty, lessonData }: Props) {
+export function InteractiveReader({ title, category, difficulty, lessonData, onClose }: Props) {
   const router = useRouter();
   const contentSlides = lessonData.content_slides || [];
   const {
@@ -172,7 +174,7 @@ export function InteractiveReader({ title, category, difficulty, lessonData }: P
       <div className="fixed top-0 left-0 w-full z-50 bg-black/80 backdrop-blur-md pt-6 pb-4 px-8 border-b border-white/5">
         <div className="max-w-xl mx-auto flex items-center justify-between">
            <button 
-             onClick={currentSlide === 0 ? () => router.push('/hub') : prevSlide} 
+             onClick={currentSlide === 0 ? (onClose || (() => router.push('/hub'))) : prevSlide} 
              className="p-2 text-white/20 hover:text-white transition-colors group"
              title={currentSlide === 0 ? "Return to Hub" : "Previous Slide"}
            >
@@ -195,13 +197,16 @@ export function InteractiveReader({ title, category, difficulty, lessonData }: P
            
            <div className="flex items-center gap-2">
              {userId && <SaveButton lessonId={lessonData.id} userId={userId} />}
-             <button 
-               onClick={() => router.push('/hub')} 
+             <Link 
+               href="/hub" 
+               onClick={(e) => { 
+                 if (onClose) { e.preventDefault(); onClose(); } 
+               }}
                className="p-2 text-white/20 hover:text-rose-500 transition-colors"
                title="Exit Lesson"
              >
                <X className="w-5 h-5" />
-             </button>
+             </Link>
            </div>
         </div>
       </div>
@@ -361,13 +366,16 @@ export function InteractiveReader({ title, category, difficulty, lessonData }: P
               </div>
 
               <div className="flex justify-center pt-8">
-                <button 
-                   onClick={() => router.push('/hub')}
+                <Link 
+                   href="/hub"
+                   onClick={(e) => { 
+                     if (onClose) { e.preventDefault(); onClose(); } 
+                   }}
                    className="px-12 py-5 bg-white text-black text-[10px] font-bold tracking-[0.3em] uppercase rounded-sm transition-all flex items-center gap-4 hover:brightness-95 shadow-2xl shadow-white/5"
                  >
                    <Home className="w-4 h-4" />
                    Return to Hub
-                 </button>
+                 </Link>
               </div>
             </motion.div>
           )}
@@ -407,12 +415,15 @@ export function InteractiveReader({ title, category, difficulty, lessonData }: P
                 >
                    Create account
                 </a>
-                <button 
-                  onClick={() => router.push('/hub')}
+                <Link 
+                  href="/hub"
+                  onClick={(e) => { 
+                    if (onClose) { e.preventDefault(); onClose(); } 
+                  }}
                   className="block w-full py-4 text-white/20 hover:text-white transition-all text-[10px] font-bold tracking-[0.3em] uppercase"
                 >
                   Back to Hub
-                </button>
+                </Link>
              </div>
            </div>
         </div>
