@@ -13,6 +13,7 @@ export interface SkillTreeNode {
   status: string;
   difficulty: string;
   position: number;
+  category_ids: string[];
 }
 
 export interface SkillTreeEdge {
@@ -27,7 +28,7 @@ export async function getSkillTree(categoryId: string): Promise<ActionResult> {
   // Fetch lessons for this category
   const { data: lessons, error: lessonErr } = await supabase
     .from('lessons')
-    .select('id, title, status, difficulty, position')
+    .select('id, title, status, difficulty, position, lesson_categories(category_id)')
     .eq('category_id', categoryId)
     .is('deleted_at', null)
     .order('position', { ascending: true });
@@ -50,6 +51,7 @@ export async function getSkillTree(categoryId: string): Promise<ActionResult> {
     status: l.status ?? 'draft',
     difficulty: l.difficulty ?? '',
     position: l.position ?? 0,
+    category_ids: ((l.lesson_categories as Array<{category_id: string}>) || []).map(lc => lc.category_id),
   }));
 
   const edges: SkillTreeEdge[] = (prereqs ?? []).map(p => ({
@@ -172,6 +174,30 @@ export async function reorderLessons(reorders: { id: string, position: number }[
 
   revalidatePath('/admin');
   revalidatePath('/admin/skill-tree');
+  revalidatePath('/hub');
+
+  return { success: true };
+}
+
+export async function toggleLessonCategory(lessonId: string, categoryId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  // Primary category is tracked in 'lessons' table, these are junction entries for hub visualization
+  const { data: existing } = await supabase
+    .from('lesson_categories')
+    .select('*')
+    .eq('lesson_id', lessonId)
+    .eq('category_id', categoryId)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase.from('lesson_categories').delete().eq('lesson_id', lessonId).eq('category_id', categoryId);
+  } else {
+    await supabase.from('lesson_categories').insert({ lesson_id: lessonId, category_id: categoryId });
+  }
+
+  revalidatePath('/admin');
   revalidatePath('/hub');
 
   return { success: true };

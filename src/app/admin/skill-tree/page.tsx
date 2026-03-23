@@ -86,6 +86,7 @@ export default function SkillTreePage() {
         <SkillTreeEditor
           initialNodes={nodes}
           initialEdges={edges}
+          categories={categories}
           onError={msg => { setError(msg); setSuccess(null); setTimeout(() => setError(null), 5000); }}
           onSuccess={msg => { setSuccess(msg); setError(null); setTimeout(() => setSuccess(null), 3000); }}
           onRefresh={fetchNodes}

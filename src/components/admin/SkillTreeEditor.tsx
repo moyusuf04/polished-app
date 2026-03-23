@@ -13,44 +13,51 @@ import {
   ChevronRight, 
   CheckCircle2, 
   Trash2,
-  X
+  X,
+  Layers
 } from 'lucide-react';
-import { addPrerequisite, removePrerequisite, reorderLessons } from '@/actions/skilltree-actions';
+import { addPrerequisite, removePrerequisite, reorderLessons, toggleLessonCategory } from '@/actions/skilltree-actions';
 import type { SkillTreeNode, SkillTreeEdge } from '@/actions/skilltree-actions';
+
+interface Category { id: string; name: string; theme_color: string; }
 
 interface Props {
   initialNodes: SkillTreeNode[];
   initialEdges: SkillTreeEdge[];
+  categories: Category[];
   onError: (msg: string) => void;
   onSuccess: (msg: string) => void;
   onRefresh?: () => Promise<void> | void;
 }
 
-export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess, onRefresh }: Props) {
+export function SkillTreeEditor({ initialNodes, initialEdges, categories, onError, onSuccess, onRefresh }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  
+  // High-performance local state for instant feedback
   const [localNodes, setLocalNodes] = useState<SkillTreeNode[]>(
     [...initialNodes].sort((a, b) => a.position - b.position)
   );
+  const [localEdges, setLocalEdges] = useState<SkillTreeEdge[]>(initialEdges);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sync with parent ONLY when initialNodes changes (e.g. category switch)
-  // But NOT when we are in the middle of a local reorder
+  // Re-sync with server data when parent re-fetches (e.g. after onRefresh finishes)
   useEffect(() => {
     if (!isSyncing) {
       setLocalNodes([...initialNodes].sort((a, b) => a.position - b.position));
+      setLocalEdges(initialEdges);
     }
-  }, [initialNodes, isSyncing]);
+  }, [initialNodes, initialEdges, isSyncing]);
 
   const selectedNode = localNodes.find(n => n.id === selectedId);
   
-  // Prerequisites for selected node
+  // Prerequisites for selected node (from local state for instant updates)
   const activePrereqs = useMemo(() => {
     if (!selectedId) return [];
-    return initialEdges
+    return localEdges
       .filter(e => e.target === selectedId)
       .map(e => e.source);
-  }, [selectedId, initialEdges]);
+  }, [selectedId, localEdges]);
 
   const filteredNodes = useMemo(() => {
     if (!searchQuery) return localNodes;
@@ -59,36 +66,11 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     );
   }, [localNodes, searchQuery]);
 
-  const handleSwap = async (id1: string, id2: string) => {
-    const n1 = localNodes.find(n => n.id === id1)!;
-    const n2 = localNodes.find(n => n.id === id2)!;
-    
-    const p1 = n1.position;
-    const p2 = n2.position;
-
-    // Optimistic UI: Swap them locally
-    const nextNodes = localNodes.map(n => {
-      if (n.id === id1) return { ...n, position: p2 };
-      if (n.id === id2) return { ...n, position: p1 };
-      return n;
-    }).sort((a, b) => a.position - b.position);
-    
-    setLocalNodes(nextNodes);
-    await syncHierarchy();
-  };
-
-  const handleReorder = (newOrder: SkillTreeNode[]) => {
-    // Instant visual update - NO database calls here to prevent jitter
-    setLocalNodes(newOrder);
-  };
-
-  const syncHierarchy = async () => {
+  const syncHierarchy = async (nodesToSync: SkillTreeNode[]) => {
     setIsSyncing(true);
-    const updatedPositions = localNodes.map((n, i) => ({ ...n, position: i }));
     const result = await reorderLessons(
-      updatedPositions.map(n => ({ id: n.id, position: n.position }))
+      nodesToSync.map((n, i) => ({ id: n.id, position: i }))
     );
-    
     if (result.success) {
       onSuccess('Hierarchy synchronized.');
       await onRefresh?.();
@@ -96,6 +78,27 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
       onError(result.error || 'Failed to sync hierarchy.');
     }
     setIsSyncing(false);
+  };
+
+  const handleSwap = async (id1: string, id2: string) => {
+    const idx1 = localNodes.findIndex(n => n.id === id1);
+    const idx2 = localNodes.findIndex(n => n.id === id2);
+    if (idx1 === -1 || idx2 === -1) return;
+
+    const nextNodes = [...localNodes];
+    [nextNodes[idx1], nextNodes[idx2]] = [nextNodes[idx2], nextNodes[idx1]];
+    
+    // Instant UI update
+    setLocalNodes(nextNodes);
+    await syncHierarchy(nextNodes);
+  };
+
+  const handleReorder = (newOrder: SkillTreeNode[]) => {
+    setLocalNodes(newOrder); // Instant visual shift
+  };
+
+  const handleDragEnd = async () => {
+    await syncHierarchy(localNodes);
   };
 
   const handleManualPosSet = async (nodeId: string, newPos: number) => {
@@ -107,28 +110,55 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
       ...withoutNode.slice(0, targetPos),
       targetNode,
       ...withoutNode.slice(targetPos)
-    ].map((n, i) => ({ ...n, position: i }));
+    ];
 
     setLocalNodes(nextNodes);
-    // For manual set, we sync immediately as it's a discrete action
-    setIsSyncing(true);
-    await reorderLessons(nextNodes.map(n => ({ id: n.id, position: n.position })));
-    await onRefresh?.();
-    setIsSyncing(false);
+    await syncHierarchy(nextNodes);
   };
 
   const togglePrereq = async (sourceId: string) => {
     if (!selectedId) return;
     const isPresent = activePrereqs.includes(sourceId);
     
+    // Instant UI update
     if (isPresent) {
+      setLocalEdges(localEdges.filter(e => !(e.target === selectedId && e.source === sourceId)));
       const res = await removePrerequisite(selectedId, sourceId);
-      if (res.success) onSuccess('Dependency removed.');
-      else onError(res.error || 'Failed to remove dependency.');
+      if (res.success) {
+        onSuccess('Dependency removed.');
+        await onRefresh?.();
+      } else onError(res.error || 'Failed to remove dependency.');
     } else {
+      setLocalEdges([...localEdges, { target: selectedId, source: sourceId }]);
       const res = await addPrerequisite(selectedId, sourceId);
-      if (res.success) onSuccess('Dependency added.');
-      else onError(res.error || 'Failed to add dependency.');
+      if (res.success) {
+        onSuccess('Dependency added.');
+        await onRefresh?.();
+      } else onError(res.error || 'Failed to add dependency.');
+    }
+  };
+
+  const toggleCategoryLink = async (catId: string) => {
+    if (!selectedId) return;
+    
+    // Optimistic UI update
+    setLocalNodes(localNodes.map(n => {
+      if (n.id === selectedId) {
+        const has = n.category_ids.includes(catId);
+        return {
+          ...n,
+          category_ids: has ? n.category_ids.filter(id => id !== catId) : [...n.category_ids, catId]
+        };
+      }
+      return n;
+    }));
+
+    const res = await toggleLessonCategory(selectedId, catId);
+    if (res.success) {
+      onSuccess('Link updated.');
+      await onRefresh?.();
+    } else {
+      onError('Failed to update link.');
     }
   };
 
@@ -144,7 +174,7 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
               Lesson Board
             </h2>
             <p className="text-white/40 text-[10px] tracking-wide font-light">
-              Sequential order dictates the core learning flow.
+              Drag to rank. Sequential order dictates the core learning flow.
             </p>
           </div>
           
@@ -171,9 +201,9 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
               value={node}
               key={node.id}
               onClick={() => setSelectedId(node.id)}
-              onDragEnd={() => syncHierarchy()}
+              onDragEnd={handleDragEnd}
               transition={{ type: 'spring', stiffness: 500, damping: 40, mass: 1 }}
-              className={`relative p-6 border transition-shadow cursor-grab active:cursor-grabbing group flex flex-col justify-between min-h-[100px] shadow-xl ${
+              className={`relative p-6 border transition-all cursor-grab active:cursor-grabbing group flex flex-col justify-between min-h-[100px] shadow-xl ${
                 selectedId === node.id 
                   ? 'border-white bg-white/[0.08] shadow-white/5 ring-1 ring-white/20 z-10' 
                   : 'border-white/5 bg-[#0d0d10] hover:border-white/10'
@@ -188,11 +218,11 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
                 <p className="text-[9px] tracking-[0.2em] font-bold text-white/20 uppercase">{node.status}</p>
                 <div className="flex items-center justify-between">
                   <h3 className="text-base text-white font-serif leading-snug">{node.title}</h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={(e) => { e.stopPropagation(); i > 0 && handleSwap(node.id, localNodes[i-1].id); }}
                       disabled={i === 0}
-                      className="p-1.5 text-white/10 hover:text-white disabled:opacity-0 transition-all"
+                      className="p-1.5 text-white/40 hover:text-white disabled:opacity-0 transition-all"
                       title="Move Up"
                     >
                       <MoveUp className="w-3.5 h-3.5" />
@@ -200,20 +230,27 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
                     <button 
                       onClick={(e) => { e.stopPropagation(); i < localNodes.length - 1 && handleSwap(node.id, localNodes[i+1].id); }}
                       disabled={i === localNodes.length - 1}
-                      className="p-1.5 text-white/10 hover:text-white disabled:opacity-0 transition-all"
+                      className="p-1.5 text-white/40 hover:text-white disabled:opacity-0 transition-all"
                       title="Move Down"
                     >
                       <MoveDown className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-                <p className="text-[9px] tracking-widest text-white/20 uppercase font-medium">{node.difficulty}</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-[9px] tracking-widest text-white/20 uppercase font-medium">{node.difficulty}</p>
+                  {node.category_ids.length > 1 && (
+                    <span className="flex items-center gap-1 text-amber-500/60 text-[8px] font-bold tracking-[0.2em] uppercase">
+                      <Layers className="w-2.5 h-2.5" />
+                      Hybrid ({node.category_ids.length})
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Interaction Bar */}
               <div className="flex items-center justify-between pt-4 mt-auto">
                  <div className="flex items-center gap-3">
-                    {initialEdges.some(e => e.target === node.id) && (
+                    {localEdges.some(e => e.target === node.id) && (
                       <span className="flex items-center gap-1 text-emerald-500/60 text-[8px] font-bold tracking-[0.2em] uppercase">
                         <LinkIcon className="w-2.5 h-2.5" />
                         Linked
@@ -250,6 +287,37 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
               </div>
             </div>
 
+            {/* Hybrid Categories */}
+            <div className="space-y-4 pt-6 border-t border-white/5">
+               <div className="space-y-2">
+                  <h5 className="text-[10px] font-bold text-white uppercase tracking-[0.25em] flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5 text-amber-500" />
+                    Cross-Category (Hybrid)
+                  </h5>
+                  <p className="text-[10px] text-white/30 font-light leading-relaxed">
+                    Link this lesson to multiple tracks simultaneously.
+                  </p>
+               </div>
+               <div className="flex flex-wrap gap-2">
+                 {categories.map(cat => {
+                   const isActive = selectedNode.category_ids.includes(cat.id);
+                   return (
+                     <button
+                       key={cat.id}
+                       onClick={() => toggleCategoryLink(cat.id)}
+                       className={`px-3 py-1.5 rounded-sm border transition-all text-[9px] font-bold tracking-widest uppercase ${
+                         isActive 
+                           ? 'bg-amber-500 text-black border-amber-500' 
+                           : 'bg-white/[0.02] border-white/5 text-white/40 hover:border-white/20'
+                       }`}
+                     >
+                       {cat.name}
+                     </button>
+                   );
+                 })}
+               </div>
+            </div>
+
             <div className="space-y-6 pt-6 border-t border-white/5">
               <div className="space-y-2">
                  <h5 className="text-[10px] font-bold text-white uppercase tracking-[0.25em] flex items-center gap-2">
@@ -257,11 +325,11 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
                     Prerequisites
                  </h5>
                  <p className="text-[10px] text-white/30 font-light leading-relaxed">
-                   Select lessons that must be completed before this one is unlocked.
+                   Select lessons required to unlock this slot.
                  </p>
               </div>
 
-              <div className="space-y-1 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
+              <div className="space-y-1 max-h-[200px] overflow-y-auto pr-2 scrollbar-hide">
                 {localNodes.filter(n => n.id !== selectedId).map(other => {
                   const isPrereq = activePrereqs.includes(other.id);
                   return (
@@ -288,9 +356,9 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
 
             <div className="pt-6 border-t border-white/5 space-y-4">
               <div className="space-y-2">
-                <h5 className="text-[10px] font-bold text-white uppercase tracking-[0.25em]">Assign Position</h5>
+                <h5 className="text-[10px] font-bold text-white uppercase tracking-[0.25em]">Direct Position Sync</h5>
                 <select 
-                  value={selectedNode.position}
+                  value={localNodes.findIndex(n => n.id === selectedId)}
                   onChange={(e) => handleManualPosSet(selectedNode.id, parseInt(e.target.value))}
                   className="w-full bg-white/[0.03] border border-white/10 text-white rounded-sm px-3 py-2 text-[11px] font-bold tracking-widest uppercase outline-none focus:border-white/30"
                 >
@@ -301,7 +369,7 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
               </div>
               <p className="text-[9px] tracking-widest text-white/20 uppercase font-bold flex items-center gap-2">
                 <Info className="w-3.5 h-3.5" />
-                Slot {selectedNode.position + 1} Current
+                Slot {localNodes.findIndex(n => n.id === selectedId) + 1} Selected
               </p>
             </div>
           </motion.div>
