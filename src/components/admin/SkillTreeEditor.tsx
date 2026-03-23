@@ -31,11 +31,15 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
   const [localNodes, setLocalNodes] = useState<SkillTreeNode[]>(
     [...initialNodes].sort((a, b) => a.position - b.position)
   );
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  // Keep local state in sync with parent updates (revalidation)
+  // Sync with parent ONLY when initialNodes changes (e.g. category switch)
+  // But NOT when we are in the middle of a local reorder
   useEffect(() => {
-    setLocalNodes([...initialNodes].sort((a, b) => a.position - b.position));
-  }, [initialNodes]);
+    if (!isSyncing) {
+      setLocalNodes([...initialNodes].sort((a, b) => a.position - b.position));
+    }
+  }, [initialNodes, isSyncing]);
 
   const selectedNode = localNodes.find(n => n.id === selectedId);
   
@@ -72,27 +76,30 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     await performReorderSync(nextNodes);
   };
 
-  const handleReorder = async (newOrder: SkillTreeNode[]) => {
-    // Update local state immediately for visual snappiness
-    const withUpdatedPositions = newOrder.map((node, i) => ({ ...node, position: i }));
-    setLocalNodes(withUpdatedPositions);
-    await performReorderSync(withUpdatedPositions);
+  const handleReorder = (newOrder: SkillTreeNode[]) => {
+    // Instant visual update - NO database calls here to prevent jitter
+    setLocalNodes(newOrder);
   };
 
-  const performReorderSync = async (nodes: SkillTreeNode[]) => {
+  const syncHierarchy = async () => {
+    setIsSyncing(true);
+    const updatedPositions = localNodes.map((n, i) => ({ ...n, position: i }));
     const result = await reorderLessons(
-      nodes.map((n, i) => ({ id: n.id, position: i }))
+      updatedPositions.map(n => ({ id: n.id, position: n.position }))
     );
-    if (result.success) onSuccess('Hierarchy synchronized.');
-    else onError(result.error || 'Failed to sync hierarchy.');
+    
+    if (result.success) {
+      onSuccess('Hierarchy synchronized.');
+    } else {
+      onError(result.error || 'Failed to sync hierarchy.');
+    }
+    setIsSyncing(false);
   };
 
   const handleManualPosSet = async (nodeId: string, newPos: number) => {
-    // Ensure pos is within bounds
     const targetPos = Math.max(0, Math.min(newPos, localNodes.length - 1));
     const targetNode = localNodes.find(n => n.id === nodeId)!;
     
-    // Remove it from current spot and insert at new spot
     const withoutNode = localNodes.filter(n => n.id !== nodeId);
     const nextNodes = [
       ...withoutNode.slice(0, targetPos),
@@ -101,7 +108,10 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     ].map((n, i) => ({ ...n, position: i }));
 
     setLocalNodes(nextNodes);
-    await performReorderSync(nextNodes);
+    // For manual set, we sync immediately as it's a discrete action
+    setIsSyncing(true);
+    await reorderLessons(nextNodes.map(n => ({ id: n.id, position: n.position })));
+    setIsSyncing(false);
   };
 
   const togglePrereq = async (sourceId: string) => {
@@ -151,17 +161,19 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
           axis="y" 
           values={localNodes} 
           onReorder={handleReorder}
-          className="space-y-6"
+          className="space-y-4"
         >
           {filteredNodes.map((node, i) => (
             <Reorder.Item
               value={node}
               key={node.id}
               onClick={() => setSelectedId(node.id)}
-              className={`relative p-6 border transition-all cursor-pointer group flex flex-col justify-between min-h-[120px] shadow-xl ${
+              onDragEnd={() => syncHierarchy()}
+              transition={{ type: 'spring', stiffness: 500, damping: 40, mass: 1 }}
+              className={`relative p-6 border transition-shadow cursor-grab active:cursor-grabbing group flex flex-col justify-between min-h-[100px] shadow-xl ${
                 selectedId === node.id 
-                  ? 'border-white bg-white/[0.05] shadow-white/5 ring-1 ring-white/20' 
-                  : 'border-white/5 bg-[#0d0d10] hover:border-white/20 hover:bg-white/[0.02]'
+                  ? 'border-white bg-white/[0.08] shadow-white/5 ring-1 ring-white/20 z-10' 
+                  : 'border-white/5 bg-[#0d0d10] hover:border-white/10'
               }`}
             >
               {/* Slot Number Badge */}
