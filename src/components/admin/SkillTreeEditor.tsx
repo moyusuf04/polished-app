@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings2, 
@@ -15,7 +15,7 @@ import {
   Trash2,
   X
 } from 'lucide-react';
-import { addPrerequisite, removePrerequisite, updateLessonPosition } from '@/actions/skilltree-actions';
+import { addPrerequisite, removePrerequisite, reorderLessons } from '@/actions/skilltree-actions';
 import type { SkillTreeNode, SkillTreeEdge } from '@/actions/skilltree-actions';
 
 interface Props {
@@ -31,6 +31,11 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
   const [localNodes, setLocalNodes] = useState<SkillTreeNode[]>(
     [...initialNodes].sort((a, b) => a.position - b.position)
   );
+
+  // Keep local state in sync with parent updates (revalidation)
+  useEffect(() => {
+    setLocalNodes([...initialNodes].sort((a, b) => a.position - b.position));
+  }, [initialNodes]);
 
   const selectedNode = localNodes.find(n => n.id === selectedId);
   
@@ -53,23 +58,30 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     const n1 = localNodes.find(n => n.id === id1)!;
     const n2 = localNodes.find(n => n.id === id2)!;
     
-    // Optimistic UI
+    const p1 = n1.position;
+    const p2 = n2.position;
+
+    // Optimistic UI: Swap them locally
     const nextNodes = localNodes.map(n => {
-      if (n.id === id1) return { ...n, position: n2.position };
-      if (n.id === id2) return { ...n, position: n1.position };
+      if (n.id === id1) return { ...n, position: p2 };
+      if (n.id === id2) return { ...n, position: p1 };
       return n;
     }).sort((a, b) => a.position - b.position);
     
     setLocalNodes(nextNodes);
 
-    const r1 = await updateLessonPosition(id1, n2.position);
-    const r2 = await updateLessonPosition(id2, n1.position);
+    // Sync to DB in one go
+    const result = await reorderLessons([
+      { id: id1, position: p2 },
+      { id: id2, position: p1 }
+    ]);
     
-    if (r1.success && r2.success) {
+    if (result.success) {
       onSuccess('Lessons reordered.');
     } else {
-      onError('Failed to sync reorder.');
-      // Rollback would go here
+      onError(result.error || 'Failed to sync reorder.');
+      // Re-sync with actual state from parent if failed
+      setLocalNodes([...initialNodes].sort((a, b) => a.position - b.position));
     }
   };
 

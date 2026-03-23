@@ -91,7 +91,7 @@ export default function HubPage() {
             format: (lesson.format as string) || '',
             xp_reward: (lesson.xp_reward as number) || 0,
           };
-        });
+        }).sort((a,b) => a.position - b.position);
 
         setLessons(hydratedLessons);
       }

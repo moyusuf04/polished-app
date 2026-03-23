@@ -156,3 +156,23 @@ export async function updateLessonPosition(lessonId: string, position: number): 
 
   return { success: true };
 }
+
+export async function reorderLessons(reorders: { id: string, position: number }[]): Promise<ActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const results = await Promise.all(
+    reorders.map(item => 
+      supabase.from('lessons').update({ position: item.position }).eq('id', item.id)
+    )
+  );
+
+  const error = results.find(r => r.error)?.error;
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/skill-tree');
+  revalidatePath('/hub');
+
+  return { success: true };
+}
