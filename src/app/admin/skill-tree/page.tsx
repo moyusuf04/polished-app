@@ -29,18 +29,20 @@ export default function SkillTreePage() {
     })();
   }, []);
 
-  useEffect(() => {
+  const fetchNodes = async () => {
     if (!activeCategory) return;
     setLoading(true);
-    (async () => {
-      const result = await getSkillTree(activeCategory);
-      if (result.success) {
-        const d = result.data as { nodes: SkillTreeNode[]; edges: SkillTreeEdge[] };
-        setNodes(d.nodes);
-        setEdges(d.edges);
-      }
-      setLoading(false);
-    })();
+    const result = await getSkillTree(activeCategory);
+    if (result.success) {
+      const d = result.data as { nodes: SkillTreeNode[]; edges: SkillTreeEdge[] };
+      setNodes(d.nodes);
+      setEdges(d.edges);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchNodes();
   }, [activeCategory]);
 
   return (
@@ -86,6 +88,7 @@ export default function SkillTreePage() {
           initialEdges={edges}
           onError={msg => { setError(msg); setSuccess(null); setTimeout(() => setError(null), 5000); }}
           onSuccess={msg => { setSuccess(msg); setError(null); setTimeout(() => setSuccess(null), 3000); }}
+          onRefresh={fetchNodes}
         />
       )}
     </div>

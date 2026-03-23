@@ -23,9 +23,10 @@ interface Props {
   initialEdges: SkillTreeEdge[];
   onError: (msg: string) => void;
   onSuccess: (msg: string) => void;
+  onRefresh?: () => Promise<void> | void;
 }
 
-export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess }: Props) {
+export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess, onRefresh }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localNodes, setLocalNodes] = useState<SkillTreeNode[]>(
@@ -73,7 +74,7 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     }).sort((a, b) => a.position - b.position);
     
     setLocalNodes(nextNodes);
-    await performReorderSync(nextNodes);
+    await syncHierarchy();
   };
 
   const handleReorder = (newOrder: SkillTreeNode[]) => {
@@ -90,6 +91,7 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     
     if (result.success) {
       onSuccess('Hierarchy synchronized.');
+      await onRefresh?.();
     } else {
       onError(result.error || 'Failed to sync hierarchy.');
     }
@@ -111,6 +113,7 @@ export function SkillTreeEditor({ initialNodes, initialEdges, onError, onSuccess
     // For manual set, we sync immediately as it's a discrete action
     setIsSyncing(true);
     await reorderLessons(nextNodes.map(n => ({ id: n.id, position: n.position })));
+    await onRefresh?.();
     setIsSyncing(false);
   };
 
