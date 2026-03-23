@@ -133,36 +133,33 @@ export default function HubPage() {
     );
   }
 
-  if (selectedLessonId) {
-    const lesson = lessons.find((l) => l.id === selectedLessonId) || lessons[0];
-
-    return (
-      <main className="min-h-screen bg-black">
-        <InteractiveReader 
-          title={lesson.title}
-          category={lesson.category}
-          difficulty={lesson.difficulty}
-          lessonData={lesson}
-          onClose={() => setSelectedLessonId(null)}
-        />
-      </main>
-    );
-  }
-
   return (
     <HubStateProvider categories={categories} userId={userId}>
-      <HubDashboard
-        lessons={lessons}
-        categories={categories}
-        isAdmin={isAdmin}
-        onSelectLesson={handleSelectLesson}
-        onSignOut={handleSignOut}
-        status={status}
-        guestId={guestId}
-        isSignupRequired={isSignupRequired}
-        handleSignupRedirect={handleSignupRedirect}
-        initialSelection={onboardingSelection}
-      />
+      {selectedLessonId ? (
+        <main className="min-h-screen bg-black">
+          <InteractiveReader 
+            title={lessons.find(l => l.id === selectedLessonId)?.title || ''}
+            category={lessons.find(l => l.id === selectedLessonId)?.category || ''}
+            difficulty={lessons.find(l => l.id === selectedLessonId)?.difficulty || ''}
+            lessonData={lessons.find(l => l.id === selectedLessonId) || lessons[0]}
+            onClose={() => setSelectedLessonId(null)}
+          />
+        </main>
+      ) : (
+        <HubDashboard
+          lessons={lessons}
+          categories={categories}
+          isAdmin={isAdmin}
+          onSelectLesson={handleSelectLesson}
+          onSignOut={handleSignOut}
+          status={status}
+          guestId={guestId}
+          isSignupRequired={isSignupRequired}
+          handleSignupRedirect={handleSignupRedirect}
+          initialSelection={onboardingSelection}
+          userId={userId}
+        />
+      )}
     </HubStateProvider>
   );
 }
@@ -182,6 +179,7 @@ interface DashboardProps {
   isSignupRequired: boolean;
   handleSignupRedirect: (e: React.MouseEvent) => void;
   initialSelection: string | null;
+  userId: string | null;
 }
 
 function HubDashboard({
@@ -195,6 +193,7 @@ function HubDashboard({
   isSignupRequired,
   handleSignupRedirect,
   initialSelection,
+  userId,
 }: DashboardProps) {
   const hub = useHubState();
 
@@ -220,6 +219,8 @@ function HubDashboard({
         currentStreak={hub.currentStreak}
         mineralGrade={hub.mineralGrade}
         lastEnergyReset={hub.lastEnergyReset}
+        lastLessonAt={hub.lastLessonAt}
+        userId={userId}
         onToggleLeft={() => hub.setLeftOpen(!hub.isLeftOpen)}
         onToggleRight={() => hub.setRightOpen(!hub.isRightOpen)}
       />

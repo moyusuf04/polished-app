@@ -139,3 +139,20 @@ export async function removePrerequisite(lessonId: string, prerequisiteId: strin
 
   return { success: true };
 }
+export async function updateLessonPosition(lessonId: string, position: number): Promise<ActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('lessons')
+    .update({ position })
+    .eq('id', lessonId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/skill-tree');
+  revalidatePath('/hub');
+
+  return { success: true };
+}

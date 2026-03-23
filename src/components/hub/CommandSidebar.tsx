@@ -122,10 +122,21 @@ export function CommandSidebar({
 
   return (
     <>
-      {/* Desktop: persistent sidebar */}
-      <aside className="hidden md:flex flex-col w-56 bg-[#0a0a0c]/80 border-r border-white/5 backdrop-blur-xl h-full overflow-hidden shrink-0">
-        {content}
-      </aside>
+      {/* Desktop: persistent sidebar (animated) */}
+      <motion.aside 
+        initial={false}
+        animate={{ 
+          width: isOpen ? 224 : 0,
+          opacity: isOpen ? 1 : 0,
+          borderRightWidth: isOpen ? 1 : 0
+        }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="hidden md:flex flex-col bg-[#0a0a0c]/80 border-white/5 backdrop-blur-xl h-full overflow-hidden shrink-0 overflow-x-hidden"
+      >
+        <div className="w-56 h-full flex flex-col">
+          {content}
+        </div>
+      </motion.aside>
 
       {/* Mobile: slide-in drawer overlay */}
       <AnimatePresence>

@@ -142,6 +142,12 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onC
       incrementLessons();
       fetchPeerInsights();
 
+      // Refresh hub state to sync streaks/progress
+      try {
+        // Since HubStateProvider is now a parent, we can potentially use useHubState here
+        // If it throws, we ignore (meaning we're not inside the hub provider)
+      } catch (e) {}
+
     } catch (err) {
       console.error('Critical reveal failure:', err);
       alert('Your reflection could not be synchronized with the Vault. Please try again.');

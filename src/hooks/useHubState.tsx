@@ -33,6 +33,8 @@ interface HubState {
   isRightOpen: boolean;
   /** Timestamp of last energy reset for time-until-recharge calculation. */
   lastEnergyReset: Date;
+  /** Timestamp of the last started/completed lesson. */
+  lastLessonAt: Date | null;
   /** Whether a profile has been loaded from Supabase. */
   isLoaded: boolean;
   /** Toggle a category on/off in the canvas. */
@@ -106,13 +108,14 @@ export function HubStateProvider({ children, categories, userId }: HubStateProvi
   // Profile state
   const [energyUnits, setEnergyUnits] = useState(ENERGY_MAX);
   const [currentStreak, setCurrentStreak] = useState(0);
+  const [lastLessonAt, setLastLessonAt] = useState<Date | null>(null);
   const [totalXp, setTotalXp] = useState(0);
   const [lastEnergyReset, setLastEnergyReset] = useState(new Date());
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Mobile drawer state
-  const [isLeftOpen, setLeftOpen] = useState(false);
-  const [isRightOpen, setRightOpen] = useState(false);
+  // Drawer state (open by default for full-fat desktop experience)
+  const [isLeftOpen, setLeftOpen] = useState(true);
+  const [isRightOpen, setRightOpen] = useState(true);
 
   // Derive mineral grade
   const mineralGrade = useMemo(() => computeGrade(totalXp), [totalXp]);
@@ -148,26 +151,33 @@ export function HubStateProvider({ children, categories, userId }: HubStateProvi
       .eq('id', userId)
       .single();
 
-    if (profile) {
-      const p = profile as ProfileData;
-      const resetDate = p.last_energy_reset ? new Date(p.last_energy_reset) : new Date();
-      setLastEnergyReset(resetDate);
+      if (profile) {
+        const p = profile as ProfileData;
+        const resetDate = p.last_energy_reset ? new Date(p.last_energy_reset) : new Date();
+        setLastEnergyReset(resetDate);
 
-      // Client-side energy reset check
-      if (shouldResetEnergy(resetDate)) {
-        setEnergyUnits(ENERGY_MAX);
-        // Persist the reset back to Supabase
-        await supabase
-          .from('profiles')
-          .update({ energy_units: ENERGY_MAX, last_energy_reset: new Date().toISOString() })
-          .eq('id', userId);
-        setLastEnergyReset(new Date());
-      } else {
-        setEnergyUnits(p.energy_units ?? ENERGY_MAX);
+        // Client-side energy reset check
+        if (shouldResetEnergy(resetDate)) {
+          setEnergyUnits(ENERGY_MAX);
+          // Persist the reset back to Supabase
+          await supabase
+            .from('profiles')
+            .update({ energy_units: ENERGY_MAX, last_energy_reset: new Date().toISOString() })
+            .eq('id', userId);
+          setLastEnergyReset(new Date());
+        } else {
+          setEnergyUnits(p.energy_units ?? ENERGY_MAX);
+        }
+
+        setCurrentStreak(p.current_streak ?? 0);
+        setLastLessonAt(p.last_lesson_at ? new Date(p.last_lesson_at) : null);
       }
 
-      setCurrentStreak(p.current_streak ?? 0);
-    }
+      // ── Sync Streak ──
+      const { data: syncedStreak } = await supabase.rpc('sync_user_streak', { p_user_id: userId });
+      if (typeof syncedStreak === 'number') {
+        setCurrentStreak(syncedStreak);
+      }
 
     // Fetch total XP
     const { data: xpData } = await supabase.rpc('mineral_grade', { p_user_id: userId });
@@ -240,6 +250,7 @@ export function HubStateProvider({ children, categories, userId }: HubStateProvi
     isLeftOpen,
     isRightOpen,
     lastEnergyReset,
+    lastLessonAt,
     isLoaded,
     toggleCategory,
     consumeEnergy,
