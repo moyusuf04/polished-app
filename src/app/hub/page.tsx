@@ -127,8 +127,55 @@ export default function HubPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-white animate-spin opacity-20" />
+      <main className="min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Background Ambient Glow — Pulses with track-inspired colors */}
+        <div className="absolute inset-0 bg-[#0d0d10]" />
+        <motion.div 
+           animate={{ 
+             opacity: [0.05, 0.15, 0.05],
+             scale: [1, 1.2, 1],
+             background: [
+               'radial-gradient(circle at 50% 50%, #52B788 0%, transparent 70%)',
+               'radial-gradient(circle at 50% 50%, #4361EE 0%, transparent 70%)',
+               'radial-gradient(circle at 50% 50%, #F59E0B 0%, transparent 70%)',
+               'radial-gradient(circle at 50% 50%, #52B788 0%, transparent 70%)',
+             ]
+           }}
+           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] blur-[150px] rounded-full" 
+        />
+        
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="w-16 h-16 border border-white/5 bg-white/[0.02] rounded-full flex items-center justify-center mb-12 relative overflow-hidden">
+             <div className="absolute inset-0 border border-white/10 rounded-full animate-ping opacity-20" />
+             <Sparkles className="w-6 h-6 text-white/20" />
+             <motion.div 
+               animate={{ x: ['-100%', '200%'] }}
+               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12"
+             />
+          </div>
+          
+          <div className="space-y-4 text-center">
+            <h1 className="text-[10px] font-bold tracking-[0.5em] uppercase text-white/10">Synchronising</h1>
+            <div className="w-48 h-[2px] bg-white/5 rounded-full overflow-hidden relative">
+              <motion.div 
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              />
+            </div>
+            <p className="text-[9px] font-medium tracking-[0.3em] uppercase text-white/5 animate-pulse italic">Mapping Intellectual Terrain...</p>
+          </div>
+        </div>
+
+        {/* Decorative Skeletons */}
+        <div className="absolute top-12 left-12 w-64 h-8 border border-white/5 rounded-full opacity-20 flex items-center px-4 gap-3">
+           <div className="w-2 h-2 rounded-full bg-white/40" />
+           <div className="w-24 h-1 bg-white/10 rounded-full" />
+           <div className="ml-auto w-12 h-1 bg-white/10 rounded-full" />
+        </div>
       </main>
     );
   }
@@ -230,8 +277,10 @@ function HubDashboard({
         {/* Left: Command Sidebar */}
         <CommandSidebar
           categories={categories}
+          lessons={lessons}
           visibleCategories={hub.visibleCategories}
           onToggleCategory={hub.toggleCategory}
+          onSelectLesson={handleLessonStart}
           isOpen={hub.isLeftOpen}
           onClose={() => hub.setLeftOpen(false)}
           isAdmin={isAdmin}
@@ -256,6 +305,7 @@ function HubDashboard({
           onClose={() => hub.setRightOpen(false)}
           isAnonymous={status === 'anonymous' || status === 'local'}
           guestId={guestId}
+          completedLessonsCount={lessons.filter(l => l.completed).length}
         />
       </div>
 

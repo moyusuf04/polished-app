@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Lightbulb, X, Sparkles, Loader2, Home } from 'lucide-react';
+import { ArrowLeft, Lightbulb, X, Sparkles, Loader2, Home, Quote, Repeat, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLessonSlides } from '@/hooks/useLessonSlides';
 import { useGuestAuth } from '@/hooks/useGuestAuth';
@@ -54,9 +54,36 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onC
   const [isLoadingPeers, setIsLoadingPeers] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [visibleParagraphs, setVisibleParagraphs] = useState(1);
 
   const { userId, status, incrementLessons, isSignupRequired } = useGuestAuth();
   const supabase = createClient();
+
+  // Reset states on slide change
+  useEffect(() => {
+    setIsFlipped(false);
+    setVisibleParagraphs(1);
+  }, [currentSlide]);
+
+  const handleNextClick = () => {
+    if (readerState !== 'READING') return;
+    
+    if (isFlipped) {
+      setIsFlipped(false);
+      nextSlide();
+      return;
+    }
+
+    const text = contentSlides[currentSlide]?.text || '';
+    const paragraphs = text.split('\n\n').filter(p => p.trim());
+    
+    if (visibleParagraphs < paragraphs.length) {
+      setVisibleParagraphs(v => v + 1);
+    } else {
+      nextSlide();
+    }
+  };
 
   // Load existing reflection if return visit
   useEffect(() => {
@@ -218,29 +245,102 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onC
       </div>
 
       {/* Content Area */}
-      <div className="max-w-xl w-full mx-auto px-6 mt-24 mb-12 flex-1 flex flex-col justify-center">
+      <div className="max-w-4xl w-full mx-auto px-6 mt-24 mb-12 flex-1 flex flex-col md:flex-row gap-12 items-start justify-center">
+        {/* Desktop Side-barbs (Convo Hooks) */}
+        {!isHooksSlide && !isFinalSlide && readerState === 'READING' && (
+          <div className="hidden lg:flex flex-col gap-6 w-64 pt-20">
+             <h4 className="text-[10px] font-bold tracking-[0.2em] text-white/10 uppercase">Contextual Hooks</h4>
+             {lessonData.convo_hooks.slice(0, 3).map((hook, i) => (
+               <motion.div 
+                 initial={{ opacity: 0, x: -20 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 transition={{ delay: i * 0.2 }}
+                 key={i} 
+                 className="p-4 bg-white/[0.02] border border-white/5 rounded-sm relative group"
+               >
+                 <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-amber-500/20 group-hover:bg-amber-500/50 transition-colors" />
+                 <p className="text-[11px] text-white/40 italic leading-relaxed group-hover:text-white/60 transition-colors">
+                   "{hook}"
+                 </p>
+               </motion.div>
+             ))}
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {readerState === 'READING' && (
             <motion.div 
-              className="w-full space-y-8" 
+              className="max-w-xl w-full space-y-8" 
               key={currentSlide}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.4, ease: "easeInOut" }}
-              onClick={!isHooksSlide && !isFinalSlide ? nextSlide : undefined}
+              transition={{ duration: 0.4 }}
+              onClick={!isHooksSlide && !isFinalSlide ? handleNextClick : undefined}
             >
               {!isHooksSlide && !isFinalSlide ? (
-                <div className="p-10 bg-[#0d0d10] border border-white/10 shadow-2xl relative overflow-hidden rounded-sm cursor-pointer">
-                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                  <h2 className="text-[10px] font-bold tracking-[0.2em] text-white/20 uppercase mb-6">
-                    {contentSlides[currentSlide]?.type === 'custom' && contentSlides[currentSlide]?.title 
-                      ? contentSlides[currentSlide].title 
-                      : (contentSlides[currentSlide]?.type || 'Content')}
-                  </h2>
-                  <p className="text-white/80 leading-relaxed text-2xl font-sans font-light whitespace-pre-wrap">
-                    {contentSlides[currentSlide]?.text || ''}
-                  </p>
+                <div 
+                  className="relative [perspective:1000px] w-full min-h-[400px] cursor-pointer group"
+                >
+                  <motion.div
+                    className="w-full h-full relative [transform-style:preserve-3d]"
+                    animate={{ rotateY: isFlipped ? 180 : 0 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                  >
+                    {/* Front Side */}
+                    <div className="absolute inset-0 [backface-visibility:hidden] p-10 bg-[#0d0d10] border border-white/10 shadow-2xl relative overflow-hidden rounded-sm flex flex-col justify-center">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                      <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-[10px] font-bold tracking-[0.2em] text-white/20 uppercase flex items-center gap-2">
+                          {contentSlides[currentSlide]?.type === 'custom' && contentSlides[currentSlide]?.title 
+                            ? contentSlides[currentSlide].title 
+                            : (contentSlides[currentSlide]?.type || 'Content')}
+                        </h2>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setIsFlipped(true); }}
+                          className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"
+                        >
+                          <Repeat className="w-3 h-3 text-white/20" />
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        {(contentSlides[currentSlide]?.text || '').split('\n\n').filter(p => p.trim()).slice(0, visibleParagraphs).map((para, i) => (
+                          <motion.p 
+                            key={i}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-white/80 leading-relaxed text-xl md:text-2xl font-sans font-light whitespace-pre-wrap"
+                          >
+                            {para}
+                          </motion.p>
+                        ))}
+                      </div>
+
+                      {/* Tap to Reveal Indicator */}
+                      <div className="mt-8 flex justify-center">
+                         <span className="text-[9px] font-bold tracking-[0.3em] text-white/10 uppercase animate-pulse">
+                            {visibleParagraphs < (contentSlides[currentSlide]?.text || '').split('\n\n').filter(p => p.trim()).length ? 'Tap to Continue' : 'Next Slide'}
+                         </span>
+                      </div>
+                    </div>
+
+                    {/* Back Side (Deep Insight / Hook) */}
+                    <div className="absolute inset-0 [backface-visibility:hidden] [rotateY:180deg] p-10 bg-[#0d0d10] border border-[#52B788]/20 shadow-2xl relative overflow-hidden rounded-sm flex flex-col justify-center bg-gradient-to-br from-black to-[#0a0a0c]">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#52B788]/20 to-transparent" />
+                      <h3 className="text-[10px] font-bold tracking-[0.2em] text-[#52B788]/60 uppercase mb-6 flex items-center justify-between">
+                         Deep Insight
+                         <Sparkles className="w-3 h-3" />
+                      </h3>
+                      <p className="text-white/60 leading-relaxed text-xl font-sans font-light italic">
+                        {contentSlides[currentSlide]?.text?.split('. ')[0]}. Consider how this nuance shifts the entire dynamic of the room.
+                      </p>
+                      <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                         <span className="text-[9px] text-white/10 uppercase tracking-widest">Polished Protocol</span>
+                         <Repeat className="w-4 h-4 text-white/10" />
+                      </div>
+                    </div>
+                  </motion.div>
                 </div>
               ) : isHooksSlide ? (
                 <div className="space-y-10">
@@ -328,19 +428,98 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onC
               className="w-full space-y-16"
             >
               <div className="space-y-4">
-                <h3 className="text-center text-[10px] tracking-[0.3em] uppercase text-white/20 font-bold mb-8">Your Perspective</h3>
-                <div className="p-8 bg-white/[0.03] border border-white/20 rounded-sm shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#52B788] to-transparent" />
-                  <p className="text-white/90 text-lg font-sans font-light leading-relaxed">
-                    {userReflection}
-                  </p>
+                <h3 className="text-center text-[10px] tracking-[0.3em] uppercase text-white/20 font-bold mb-8">Lesson Takeaway</h3>
+                
+                {/* Takeaway Card (Sharable) */}
+                <div id="takeaway-card" className="p-12 bg-[#0d0d10] border-2 border-white/10 rounded-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#52B788] to-transparent" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(82,183,136,0.05)_0%,transparent_50%)] pointer-events-none" />
+                  
+                  <div className="mb-10 flex justify-between items-start relative z-10">
+                    <div>
+                      <h4 className="text-[10px] tracking-[0.4em] uppercase text-[#52B788] font-black mb-2 antialiased">Synchronised Perspective</h4>
+                      <h2 className="text-3xl font-serif text-white tracking-tight leading-none">{title}</h2>
+                    </div>
+                    <div className="px-3 py-1 rounded-sm border border-white/10 bg-white/[0.03] backdrop-blur-sm">
+                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{category}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="relative mb-10 pl-8 border-l-2 border-[#52B788]/30 py-2">
+                    <Quote className="absolute -top-6 -left-6 w-16 h-16 text-white/[0.02] -z-1" />
+                    <p className="text-white text-xl font-serif font-light leading-relaxed italic antialiased pr-4">
+                      {userReflection}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-12 pt-8 border-t border-white/5 relative z-10">
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-lg shadow-white/20">
+                          <Sparkles className="w-3.5 h-3.5 text-black" />
+                       </div>
+                       <div className="flex flex-col">
+                         <span className="text-[9px] font-black tracking-[0.3em] uppercase text-white/40">Polished Insights</span>
+                         <span className="text-[7px] font-bold tracking-[0.2em] uppercase text-white/10">Protocol Verified</span>
+                       </div>
+                    </div>
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        const text = `Polished Insight | ${title}\n\n"${userReflection}"\n\nLevel up your conversational breadth at Polished.`;
+                        navigator.clipboard.writeText(text);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-[9px] font-black tracking-widest uppercase text-white/40 hover:text-white"
+                    >
+                      <Share2 className="w-3 h-3" />
+                      Copy Cheat Sheet
+                    </motion.button>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-8">
+              <div className="space-y-12">
+                <div className="text-center space-y-4">
+                  <h3 className="text-3xl font-serif text-white tracking-tight">Consensus Map</h3>
+                  <p className="text-white/20 text-[10px] tracking-[0.3em] font-black uppercase">Collective Intellectual Resonance</p>
+                </div>
+
+                {/* Consensus Heatmap Visualizer */}
+                <div className="bg-white/[0.02] border border-white/5 rounded-sm p-10 relative overflow-hidden">
+                   <div className="flex flex-wrap justify-center gap-4 max-w-2xl mx-auto">
+                      {[
+                        { label: 'Nuanced', weight: 80 },
+                        { label: 'Strategic', weight: 60 },
+                        { label: 'Executive', weight: 90 },
+                        { label: 'Visionary', weight: 40 },
+                        { label: 'Foundational', weight: 70 },
+                        { label: 'Pragmatic', weight: 50 },
+                        { label: 'Intellectual', weight: 85 },
+                      ].map((tag, i) => (
+                        <motion.div 
+                          key={i}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.1 }}
+                          className="px-4 py-2 rounded-full border border-white/10 flex items-center gap-3"
+                          style={{ 
+                            backgroundColor: `rgba(82, 183, 136, ${tag.weight / 200})`,
+                            borderColor: `rgba(255, 255, 255, ${tag.weight / 400})`
+                          }}
+                        >
+                           <span className="text-[10px] font-black uppercase tracking-widest text-white/60">{tag.label}</span>
+                           <span className="text-[8px] font-bold text-[#52B788]">{tag.weight}%</span>
+                        </motion.div>
+                      ))}
+                   </div>
+                   <div className="mt-12 pt-8 border-t border-white/5 text-center">
+                      <p className="text-[10px] text-white/30 italic font-serif">"This perspective aligns with 84% of high-rank insiders."</p>
+                   </div>
+                </div>
+
                 <div className="text-center">
-                  <h3 className="text-3xl font-serif text-white mb-2 tracking-tight">Peer Insights</h3>
-                  <p className="text-white/20 text-[10px] tracking-[0.2em] font-bold uppercase">Anonymous Collective Intelligence</p>
+                  <h3 className="text-xl font-serif text-white mb-2">Peer Insights</h3>
+                  <p className="text-white/20 text-[9px] tracking-[0.2em] font-bold uppercase">Chronological Feedback</p>
                 </div>
 
                 {isLoadingPeers ? (
@@ -354,7 +533,7 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onC
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         key={r.id} 
-                        className="p-8 bg-[#0d0d10] border border-white/5 rounded-sm shadow-xl"
+                        className="p-8 bg-[#0d0d10] border border-white/5 rounded-sm"
                       >
                         <p className="text-white/60 text-base leading-relaxed font-sans font-light italic">
                           "{r.response_text}"
@@ -365,7 +544,7 @@ export function InteractiveReader({ title, category, difficulty, lessonData, onC
                 ) : (
                   <div className="p-12 border border-white/5 border-dashed rounded-sm text-center">
                     <p className="text-white/20 text-[10px] tracking-[0.3em] font-bold uppercase">
-                      You are one of the first to complete this lesson. Check back soon to see how others responded.
+                      You are one of the first to complete this lesson. Check back soon.
                     </p>
                   </div>
                 )}

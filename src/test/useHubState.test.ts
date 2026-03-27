@@ -105,12 +105,15 @@ describe('Energy Consumption Edge Cases', () => {
 
 describe('Category Toggle Persistence', () => {
   beforeEach(() => {
+    const store: Record<string, string> = {};
     vi.stubGlobal('localStorage', {
-      store: {} as Record<string, string>,
-      getItem(key: string) { return this.store[key] ?? null; },
-      setItem(key: string, value: string) { this.store[key] = value; },
-      removeItem(key: string) { delete this.store[key]; },
-    });
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, value: string) => { store[key] = value; },
+      removeItem: (key: string) => { delete store[key]; },
+      clear: () => { Object.keys(store).forEach(k => delete store[k]); },
+      key: (index: number) => Object.keys(store)[index] || null,
+      length: 0, // Simplified for this test context or can use a getter if needed
+    } as unknown as Storage);
   });
 
   it('should persist toggled categories to localStorage', () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { z } from 'zod';
 import DOMPurify from 'isomorphic-dompurify';
+import { motion } from 'framer-motion';
 
 // Strictly limit input text length to prevent DB bloating or extreme payloads
 const reflectionSchema = z.string()
@@ -104,9 +105,18 @@ export function ReflectionBox({ lessonId, prompt, onSuccess, initialValue = '', 
               <button
                 type="submit"
                 disabled={isSubmitting || !isMet}
-                className="w-full sm:w-auto bg-white text-black px-12 py-4 text-xs font-bold tracking-[0.2em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed transition-all shadow-xl shadow-white/5"
+                className="w-full sm:w-auto bg-white text-black px-12 py-4 text-xs font-bold tracking-[0.2em] uppercase rounded-sm border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed transition-all shadow-xl shadow-white/5 relative overflow-hidden group"
               >
-                {isSubmitting ? 'Syncing...' : 'Submit Reflection'}
+                <span className="relative z-10">{isSubmitting ? 'Syncing...' : 'Submit Reflection'}</span>
+                
+                {isMet && !isSubmitting && (
+                  <motion.div 
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '100%' }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "linear", repeatDelay: 1 }}
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12 z-0"
+                  />
+                )}
               </button>
             </div>
           )}

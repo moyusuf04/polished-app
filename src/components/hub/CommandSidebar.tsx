@@ -1,15 +1,18 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, ShieldHalf, LogOut } from 'lucide-react';
+import { X, User, ShieldHalf, LogOut, Compass, Sparkles } from 'lucide-react';
 import { MINERALS } from '@/lib/design-tokens';
-import type { CategoryData } from '@/components/PodHub';
+import type { CategoryData, LessonData } from '@/components/PodHub';
 import Link from 'next/link';
+import { useMemo } from 'react';
 
 interface Props {
   categories: CategoryData[];
+  lessons: LessonData[];
   visibleCategories: Record<string, boolean>;
   onToggleCategory: (id: string) => void;
+  onSelectLesson: (id: string) => void;
   isOpen: boolean;
   onClose: () => void;
   isAdmin: boolean;
@@ -31,15 +34,62 @@ function getCategoryColor(name: string): string {
 
 export function CommandSidebar({
   categories,
+  lessons,
   visibleCategories,
   onToggleCategory,
+  onSelectLesson,
   isOpen,
   onClose,
   isAdmin,
   onSignOut,
 }: Props) {
+  // Discovery: Pick a random lesson from an unexplored category
+  const discoveryLesson = useMemo(() => {
+    // Categories with 0 completed lessons
+    const unexploredCategoryIds = categories
+      .filter(cat => {
+        const catLessons = lessons.filter(l => l.category_id === cat.id || l.category_ids?.includes(cat.id));
+        return !catLessons.some(l => l.completed);
+      })
+      .map(cat => cat.id);
+    
+    let potentialLessons = lessons.filter(l => {
+      const ids = l.category_ids || [l.category_id];
+      return ids.some(id => unexploredCategoryIds.includes(id)) && !l.completed;
+    });
+
+    // Fallback: any uncompleted lesson
+    if (potentialLessons.length === 0) {
+      potentialLessons = lessons.filter(l => !l.completed);
+    }
+
+    if (potentialLessons.length === 0) return null;
+    return potentialLessons[Math.floor(Math.random() * potentialLessons.length)];
+  }, [categories, lessons]);
+
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
+      {/* Discovery Tab */}
+      {discoveryLesson && (
+        <div className="p-4 border-b border-white/5 bg-gradient-to-br from-cyan-500/[0.03] to-transparent">
+          <div className="flex items-center gap-2 mb-3">
+            <Compass className="w-3.5 h-3.5 text-cyan-400/60" />
+            <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+              Discovery
+            </h3>
+          </div>
+          <button 
+            onClick={() => onSelectLesson(discoveryLesson.id)}
+            className="w-full text-left p-3 rounded-sm bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] transition-all group"
+          >
+            <p className="text-[11px] text-white/80 font-medium mb-1 line-clamp-1">{discoveryLesson.title}</p>
+            <div className="flex items-center gap-2">
+               <span className="text-[8px] text-cyan-400/40 uppercase tracking-widest font-bold">Unexplored Track</span>
+               <Sparkles className="w-2.5 h-2.5 text-amber-500/20 group-hover:text-amber-500/60 transition-colors" />
+            </div>
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div className="p-5 border-b border-white/5">
         <h2 className="text-[10px] font-bold tracking-[0.25em] uppercase text-white/30">
