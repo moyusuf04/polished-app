@@ -62,31 +62,49 @@ body {
 
 /* Midnight Umber gradient background */
 .midnight-umber {
-  background: linear-gradient(175deg, #1a120b 0%, #0d0906 40%, #0a0a0a 100%);
+  background: linear-gradient(175deg, #120d09 0%, #0a0a0a 100%);
 }
 
-/* Linen Canvas texture overlay – CSS mockup */
+/* Antique Creme – for high contrast overlapping cards */
+.antique-creme {
+  background-color: #f5f2ed;
+  color: #1a120b;
+}
+
+/* Linen Canvas texture overlay – intensifying for more tactile mockup */
 .linen-canvas {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.12; /* Increased for visibility */
   background-image:
     repeating-linear-gradient(
       0deg,
       transparent,
-      transparent 2px,
-      rgba(210, 190, 160, 0.15) 2px,
-      rgba(210, 190, 160, 0.15) 3px
+      transparent 1px,
+      rgba(210, 190, 160, 0.2) 1px,
+      rgba(210, 190, 160, 0.2) 2px
     ),
     repeating-linear-gradient(
       90deg,
       transparent,
-      transparent 2px,
-      rgba(210, 190, 160, 0.1) 2px,
-      rgba(210, 190, 160, 0.1) 3px
+      transparent 1px,
+      rgba(210, 190, 160, 0.15) 1px,
+      rgba(210, 190, 160, 0.15) 2px
     );
-  background-size: 4px 4px;
+  background-size: 3px 3px;
+}
+
+/* Framed image asset like a physical painting */
+.framed-image {
+  box-shadow: 
+    0 30px 60px -15px rgba(0,0,0,0.9),
+    0 0 0 1px rgba(255,255,255,0.06);
+  border-radius: 2px;
+}
+
+.bg-radial-vignette {
+  background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.6) 100%);
 }
 
 /* Blur-In Reveal animation for hero headline */

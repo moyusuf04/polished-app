@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, Variants } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import Footer from "@/components/Footer";
+import Image from "next/image";
 
 // ── Bento Card wrapper with engraved gold-to-charcoal border ──
 function BentoCard({
@@ -52,14 +53,13 @@ function EnergyCard() {
         Learning Battery
       </p>
       <p className="text-xs text-white/40 leading-relaxed mb-6">
-        A daily energy system that makes every lesson count. When the battery runs dry, the knowledge locks – fueling intentional study.
+        A daily energy system that makes every lesson count. These psychological limiters fuel intentional study.
       </p>
 
       {/* Battery visual */}
       <div className="mt-auto relative">
         <div className="liquid-fill-container h-28 rounded-lg bg-white/[0.03] border border-white/[0.06]">
           <div className={`liquid-fill ${isInView ? 'animate' : ''}`} />
-          {/* Energy units */}
           <div className="absolute inset-0 flex items-end justify-center pb-3 z-10">
             <div className="flex gap-1.5">
               {[1, 2, 3].map((i) => (
@@ -104,18 +104,17 @@ function MineralTierCard() {
         Mineral Tiers
       </p>
       <p className="text-xs text-white/40 leading-relaxed mb-8">
-        Your rank evolves as you learn. From raw Quartz to the clarity of Diamond – each tier earned through consistent engagement.
+        Your rank evolves from raw Quartz to the clarity of Diamond through consistent engagement.
       </p>
 
-      {/* Tier visualization */}
       <div className="mt-auto flex flex-col gap-4">
         {tiers.map((tier, i) => (
-          <div key={tier.label} className="flex items-center gap-3">
+          <div key={tier.label} className="flex items-center gap-3 relative">
             <motion.div
               initial={{ scale: 0, opacity: 0 }}
               animate={isInView ? { scale: 1, opacity: 1 } : {}}
               transition={{ delay: 0.4 + i * 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="w-8 h-8 rounded-full flex-shrink-0"
+              className="w-8 h-8 rounded-full flex-shrink-0 z-10"
               style={{
                 background: `radial-gradient(circle at 35% 35%, ${tier.color}, ${tier.color}44)`,
                 boxShadow: `0 0 12px ${tier.color}33`,
@@ -125,9 +124,8 @@ function MineralTierCard() {
               <p className="text-sm text-white/80 font-medium">{tier.label}</p>
               <p className="text-[10px] text-white/30 tracking-wider">{tier.xp}</p>
             </div>
-            {/* Connecting line (except last) */}
             {i < tiers.length - 1 && (
-              <div className="absolute left-[39px] mt-12 w-px h-4 bg-gradient-to-b from-white/10 to-transparent" />
+              <div className="absolute left-[15.5px] top-[32px] w-[1px] h-[32px] bg-gradient-to-b from-white/10 to-transparent" />
             )}
           </div>
         ))}
@@ -136,7 +134,7 @@ function MineralTierCard() {
   );
 }
 
-// ── Interactive Reader Preview Card ──
+// ── Interactive Reader Card ──
 function ReaderPreviewCard() {
   return (
     <div className="h-full flex flex-col p-6">
@@ -147,12 +145,10 @@ function ReaderPreviewCard() {
         Interactive Reader
       </p>
       <p className="text-xs text-white/40 leading-relaxed mb-6">
-        Immersive lessons with curated content designed to build conversational fluency across culture, history, and modern thought.
+        Immersive lessons with curated content across culture, history, and modern thought.
       </p>
 
-      {/* Reader preview mockup */}
       <div className="mt-auto relative rounded-lg bg-white/[0.03] border border-white/[0.06] p-5 overflow-hidden">
-        {/* Dropped cap */}
         <div className="flex gap-3">
           <span className="font-serif text-4xl text-white/60 leading-none float-left select-none">
             T
@@ -161,8 +157,6 @@ function ReaderPreviewCard() {
             he Renaissance was not merely an artistic movement – it was a complete reimagining of what it meant to be human…
           </p>
         </div>
-
-
       </div>
     </div>
   );
@@ -188,127 +182,136 @@ export default function Home() {
     }
   };
 
-  const heroItemVariants = {
+  const heroItemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] as const },
+      transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
     },
-  } as const;
+  };
 
   return (
-    <main className="midnight-umber min-h-screen relative overflow-hidden">
+    <main className="midnight-umber min-h-screen relative overflow-hidden bg-black selection:bg-zinc-800 selection:text-white">
       {/* Linen Canvas texture overlay */}
       <div className="linen-canvas" />
 
-      {/* ═══════ HERO: The Celestial Foyer ═══════ */}
-      <section className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6">
-        <motion.div
-          className="text-center max-w-lg mx-auto w-full"
-          initial="hidden"
-          animate="visible"
-          transition={{ staggerChildren: 0.15 }}
-        >
-          {/* Main headline – Blur-In Reveal */}
-          <h1
-            className="blur-in-reveal text-6xl md:text-8xl font-serif text-white mb-6 tracking-tight drop-shadow-sm shimmer-text"
-          >
-            Polished.
-          </h1>
-
-          <motion.p
-            variants={heroItemVariants}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.8 }}
-            className="text-white/40 text-lg md:text-xl font-sans font-light tracking-wide mb-14"
-          >
-            Conversational breadth for the ambitious.
-          </motion.p>
-
-          {/* CTA buttons */}
-          <motion.div
-            variants={heroItemVariants}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 1.0 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full px-2 mb-10"
-          >
-            <Link
-              href="/signup"
-              className="w-full sm:w-1/2 flex items-center justify-center py-4 px-8 bg-white text-black text-xs font-bold tracking-widest uppercase rounded-sm shadow-xl shadow-white/5 border-b-4 border-zinc-300 active:translate-y-px active:border-b-0 hover:brightness-95 transition-all"
+      {/* ═══════ HERO: The Asymmetrical Temple Entrance ═══════ */}
+      <section className="relative z-10 w-full min-h-screen flex flex-col pt-24 md:pt-32 px-6 overflow-hidden">
+        <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row gap-12 items-start relative pb-20">
+          
+          {/* Headline - Shifted Left */}
+          <div className="w-full md:w-5/12 z-20">
+            <motion.h1
+              className="text-7xl md:text-9xl font-serif text-white tracking-tight blur-in-reveal mb-8"
+              style={{ lineHeight: 0.9 }}
             >
-              Sign Up
-            </Link>
-            <Link
-              href="/login"
-              className="w-full sm:w-1/2 flex items-center justify-center py-4 px-8 bg-transparent text-white/60 border border-white/10 text-xs font-bold tracking-widest uppercase rounded-sm hover:border-white/30 hover:text-white transition-all active:translate-y-px"
-            >
-              Log In
-            </Link>
+              Polished.
+            </motion.h1>
+            
+            <div className="h-px w-24 bg-gradient-to-r from-white/40 to-transparent mb-12 hidden md:block" />
+          </div>
+
+          {/* Centerpiece Image - Large and Layered */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full md:w-7/12 relative aspect-[4/5] md:aspect-[4/3] max-h-[70vh] framed-image overflow-hidden"
+          >
+            <Image 
+              src="/temple-centerpiece.png"
+              alt="Temple of Knowledge"
+              fill
+              className="object-cover brightness-90 contrast-110"
+              priority
+            />
+            {/* Subtle overlay gradients */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-radial-vignette opacity-50" />
           </motion.div>
 
-          {/* Try as Guest – Glassmorphic treatment */}
+          {/* High-Contrast "Note" Block (Tagline & CTA) - Overlapping */}
           <motion.div
             variants={heroItemVariants}
             initial="hidden"
             animate="visible"
-            transition={{ delay: 1.15 }}
+            className="antique-creme w-full md:max-w-md p-10 md:absolute md:bottom-[-40px] md:right-0 z-30 shadow-2xl rounded-sm"
           >
-            <button
-              onClick={handleGuestSignIn}
-              disabled={isGuestLoading}
-              className="mx-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] text-white/30 hover:text-white/50 hover:border-white/15 font-medium text-[10px] tracking-[0.2em] uppercase transition-all"
-            >
-              {isGuestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Try as Guest"}
-            </button>
+            <p className="font-serif text-[10px] tracking-[0.3em] uppercase opacity-40 mb-6">
+              The Essence
+            </p>
+            <h2 className="text-3xl font-serif leading-tight mb-8">
+              Conversational breadth for the ambitious.
+            </h2>
+            
+            <div className="flex flex-col gap-5">
+              <Link
+                href="/signup"
+                className="w-full flex items-center justify-center py-4 bg-[#1a120b] text-white text-[10px] font-bold tracking-widest uppercase hover:brightness-110 transition-all rounded-sm"
+              >
+                Enter the Void
+              </Link>
+              <div className="flex gap-4">
+                <Link
+                  href="/login"
+                  className="flex-1 flex items-center justify-center py-4 border border-[#1a120b]/20 text-[#1a120b] text-[10px] font-bold tracking-widest uppercase hover:bg-black/5 transition-all rounded-sm"
+                >
+                  Log In
+                </Link>
+                <button
+                  onClick={handleGuestSignIn}
+                  disabled={isGuestLoading}
+                  className="flex-1 flex items-center justify-center py-4 bg-[#1a120b]/5 text-[#1a120b] text-[10px] font-bold tracking-widest uppercase hover:bg-[#1a120b]/10 transition-all rounded-sm backdrop-blur-sm"
+                >
+                  {isGuestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Try as Guest"}
+                </button>
+              </div>
+            </div>
           </motion.div>
-        </motion.div>
+        </div>
 
-        {/* Scroll indicator */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
-        >
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="w-px h-8 bg-gradient-to-b from-white/20 to-transparent"
+        {/* Scroll indicator - Architectural rule */}
+        <div className="mt-auto pb-12 w-full flex justify-center">
+          <motion.div 
+            animate={{ height: [0, 60, 0], opacity: [0.2, 0.4, 0.2] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            className="w-[1px] bg-white rounded-full"
           />
-        </motion.div>
+        </div>
       </section>
 
       {/* ═══════ BENTO: Renaissance Feature Gallery ═══════ */}
-      <section className="relative z-10 px-6 pb-24 max-w-5xl mx-auto">
+      <section className="relative z-10 px-6 py-32 max-w-6xl mx-auto">
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="text-center text-[10px] tracking-[0.3em] uppercase text-white/25 mb-12"
+          className="text-center text-[10px] tracking-[0.4em] uppercase text-white/30 mb-20"
         >
-          What Awaits Inside
+          Curated Features
         </motion.p>
 
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 auto-rows-auto">
-          {/* Card 1: Learning Battery – Square */}
-          <BentoCard className="md:col-span-1 min-h-[320px]" delay={0}>
+        {/* Bento Grid layout matching the editorial feel */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-5 auto-rows-[320px]">
+          {/* Learning Battery - Small square */}
+          <BentoCard className="md:col-span-1" delay={0}>
             <EnergyCard />
           </BentoCard>
 
-          {/* Card 2: Mineral Tier – Tall, spans 2 rows */}
-          <BentoCard className="md:col-span-1 md:row-span-2 min-h-[320px]" delay={0.12}>
+          {/* Mineral Tier - Tall centerpiece of bento */}
+          <BentoCard className="md:col-span-2 md:row-span-2" delay={0.1}>
             <MineralTierCard />
           </BentoCard>
 
-          {/* Card 3: Interactive Reader – Square */}
-          <BentoCard className="md:col-span-1 min-h-[320px]" delay={0.24}>
+          {/* Interactive Reader - Square */}
+          <BentoCard className="md:col-span-1" delay={0.2}>
             <ReaderPreviewCard />
           </BentoCard>
+
+          {/* Reserved for future or just empty spacing to maintain asymmetry */}
+          <div className="hidden md:block md:col-span-1" />
         </div>
       </section>
 
